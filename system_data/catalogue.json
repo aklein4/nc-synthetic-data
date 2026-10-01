@@ -1,0 +1,482 @@
+[
+  {
+    "name": "River Otter at a Sheltered Reach",
+    "subject": "animal-behavior",
+    "brief": "A river otter lives along a sheltered river reach with muddy banks, exposed roots, reed beds and quiet pools. Water level, current, water clarity and bank cover vary. Related observable responses include its route, travel speed, swimming depth, surfacing pattern, water entry, water exit, turn frequency and resting posture."
+  },
+  {
+    "name": "A Backyard Weather Station",
+    "subject": "weather",
+    "brief": "A small outdoor space contains a rain gauge, a windsock, a shaded thermometer, and open sky above a patch of grass. Observations can include cloud cover, rainfall, wind direction, air temperature, and the time of day, with nearby trees and buildings noted as part of the surroundings."
+  },
+  {
+    "name": "Bean Seedling Growth",
+    "subject": "plant-growth",
+    "brief": "Several bean seedlings grow in separate cups of potting soil near a window. Their leaves, stems, height, and visible orientation can be observed over several days, along with the cups’ positions, the amount of daylight, and the condition of the soil surface."
+  },
+  {
+    "name": "Visible Traits in a Plant Family",
+    "subject": "visible-inheritance",
+    "brief": "A gardener keeps labeled pictures of parent plants and their offspring from several generations of garden peas. The visible details include flower color, seed appearance, and plant height. The plants’ labels and family relationships are available for comparison, with no need to infer traits that cannot be seen."
+  },
+  {
+    "name": "Water Through a Garden Channel",
+    "subject": "stream-flow",
+    "brief": "A shallow channel in a garden carries water past smooth stones, a bend, and a narrow wooden bridge. Observations can include the visible direction and speed of the water, its depth at different spots, and the changing positions of floating leaves."
+  },
+  {
+    "name": "Soil in Three Beds",
+    "subject": "soil-texture",
+    "brief": "Three garden beds contain soil with different visible mixtures of fine grains, coarse grains, and small stones. A hand trowel, a clear jar, and a little water are nearby. Observations can describe the soil’s appearance, clumps, dampness, and feel when handled."
+  },
+  {
+    "name": "A Muddy Footpath Edge",
+    "subject": "bank-erosion",
+    "brief": "A rain-exposed footpath runs beside a shallow ditch, with bare soil, grass tufts, and a small patch of exposed roots along its edge. After wet weather, observers can note the path’s outline, loose soil, small channels, and any change in the exposed bank."
+  },
+  {
+    "name": "Sand in a Settling Jar",
+    "subject": "sediment-settling",
+    "brief": "A clear jar holds water collected from a pond edge, including visible bits of sand and fine mud. It stands on a steady table beside an undisturbed jar of clear water. Observations can record the appearance of the contents at different times and the layers, if any, at the bottom."
+  },
+  {
+    "name": "A Pebbly Beach Margin",
+    "subject": "shoreline-change",
+    "brief": "A small beach has a gently sloping edge, scattered pebbles, strips of seaweed, and a marked line above the usual water edge. At different visits, observers can note the waterline, the positions of distinctive stones, and the visible shape of the beach."
+  },
+  {
+    "name": "Snow and Ice on a Porch",
+    "subject": "snow-and-ice",
+    "brief": "A porch holds patches of loose snow, compacted snow, and clear ice beside a shaded wall and a sunlit step. Observations can describe their color, surface texture, thickness, and visible changes during the day, along with the surrounding air and surface conditions."
+  },
+  {
+    "name": "A Tuning Fork on a Table",
+    "subject": "sound-vibration",
+    "brief": "A tuning fork, a wooden tabletop, and a bowl of water sit in a quiet room. Observers can note what is heard and seen when the fork is used, including any visible movement at the water surface and the sounds heard at different places in the room."
+  },
+  {
+    "name": "A Courtyard Echo",
+    "subject": "echoes",
+    "brief": "A quiet courtyard has a brick wall on one side and an open lawn on the other. A hand clap or spoken word can be made from several marked spots. Observations can describe the sound heard, the location of the listener, and the nearby walls and open spaces."
+  },
+  {
+    "name": "Light Through Colored Glass",
+    "subject": "light-transmission",
+    "brief": "Sheets of clear, frosted, and colored glass are arranged between a window and a pale wall. Observers can describe the brightness, color, and sharpness of the light on the wall, along with the glass position and the changing daylight outside."
+  },
+  {
+    "name": "A Fence’s Moving Shadow",
+    "subject": "shadows",
+    "brief": "A short fence stands beside a flat paved area with a chalk outline of its morning shadow. At several times of day, observers can note the shadow’s length, direction, and outline, along with the fence’s position and the visible location of the sun."
+  },
+  {
+    "name": "Reflections in a Shop Window",
+    "subject": "reflection",
+    "brief": "A broad shop window faces a sidewalk with a bench, a tree, and passing pedestrians. Observers can compare the visible reflection with the objects behind the glass and note how the reflected scene looks from different sidewalk positions and under different sky conditions."
+  },
+  {
+    "name": "Corks and Stones in a Basin",
+    "subject": "buoyancy",
+    "brief": "A wide basin contains water, several corks, smooth stones, a metal spoon, and a wooden block. Each item can be placed in the water and observed from the side. Notes can describe which items remain at the surface, rest below it, or change position."
+  },
+  {
+    "name": "Capillary Movement in Cloth",
+    "subject": "capillary-action",
+    "brief": "Students compare strips of woven cloth touching shallow water. Weave, contact with water and hanging direction can vary; they observe the position and shape of damp regions."
+  },
+  {
+    "name": "Starch Samples and Iodine",
+    "subject": "starch-indicators",
+    "brief": "Students observe small food samples after a teacher adds an indicator. Sample preparation, temperature and indicator contact can vary. Describe visible color changes without chemical equations."
+  },
+  {
+    "name": "Fruit Ripening in Containers",
+    "subject": "fruit-ripening",
+    "brief": "Students compare one kind of fruit in open and covered containers under different light and temperature conditions, observing color, firmness and skin appearance."
+  },
+  {
+    "name": "Air Bubbles in Foam",
+    "subject": "foams",
+    "brief": "A class compares foam made from a mild soap solution. Stirring, water temperature and resting conditions vary; students observe bubble shape, size and persistence."
+  },
+  {
+    "name": "A Battery and a Small Bulb",
+    "subject": "simple-circuits",
+    "brief": "A small battery, a miniature bulb, and insulated wires are arranged on a tabletop, with a simple switch nearby. Observers can record the visible connections, the switch position, and whether the bulb appears lit in each arrangement, without opening or altering the battery."
+  },
+  {
+    "name": "Magnets and Metal Objects",
+    "subject": "magnetism",
+    "brief": "A bar magnet lies on a paper-covered table beside a steel paper clip, an aluminum tab, a wooden bead, and a second magnet. Observations can record which objects move or remain still, their positions, and the arrangement of the magnets."
+  },
+  {
+    "name": "Shoes on Different Floors",
+    "subject": "friction",
+    "brief": "A rubber-soled shoe rests on a smooth tile, a rough concrete slab, and a short section of carpet. A person can gently slide the shoe on each surface. Observations can describe the movement and the feel of each floor without ranking the surfaces in advance."
+  },
+  {
+    "name": "A Balanced Playground Seesaw",
+    "subject": "balance",
+    "brief": "A short seesaw has a central support and room for small sandbags at marked places on either side. Observers can note its tilt and the locations of the bags during different arrangements, with the board, support, and surrounding ground kept in view."
+  },
+  {
+    "name": "A Classroom Balance Beam",
+    "subject": "lever-action",
+    "brief": "Students place identical small weights at different positions on a supported beam. Questions concern qualitative changes in tilt or motion, with no calculations."
+  },
+  {
+    "name": "Water on Leaf Surfaces",
+    "subject": "surface-wetting",
+    "brief": "Drops of water are placed on broad leaves from a cabbage plant and on a smooth ceramic plate. Observers can describe the outlines, shapes, and movement of the drops, along with the surfaces’ visible textures and any dust or moisture already present."
+  },
+  {
+    "name": "A Cold Glass in a Kitchen",
+    "subject": "condensation",
+    "brief": "A chilled glass stands on a dry plate in a warm kitchen, beside a room-temperature glass. Observers can note the appearance of each outside surface, the plate, and the surrounding air at intervals, including any visible droplets or changes in clarity."
+  },
+  {
+    "name": "A Shallow Tray of Water",
+    "subject": "evaporation",
+    "brief": "Two shallow dishes hold equal-looking amounts of water, one on a sunny windowsill and one on a shelf away from direct sunlight. Observations can include the visible water level, dish location, sunlight, and room conditions at several points in the day."
+  },
+  {
+    "name": "Leaves in a Compost Pile",
+    "subject": "composting",
+    "brief": "A garden compost pile contains fallen leaves, grass clippings, vegetable scraps, and a few small twigs. Its surface and sides can be observed during weekly visits. Notes can describe the visible materials, dampness, smell, and changes in their recognizable appearance."
+  },
+  {
+    "name": "Dandelion Seed Heads",
+    "subject": "seed-dispersal",
+    "brief": "A group of dandelion plants grows beside a lawn, with mature seed heads, younger flowers, and bare ground nearby. Observers can note the seed heads’ appearance, the positions of loose seeds, and the surrounding wind and vegetation during outdoor visits."
+  },
+  {
+    "name": "Air Through a Windowed Room",
+    "subject": "ventilation",
+    "brief": "A small room has one openable window, a door, a paper ribbon, and a light curtain. Observers can record the positions of the window and door, the movement of the ribbon and curtain, and the room’s air conditions at different times."
+  },
+  {
+    "name": "Paper Under a Stack of Books",
+    "subject": "paper-strength",
+    "brief": "Sheets of thin notebook paper, thicker card, and folded paper sit beside a small stack of books. Each sample can be inspected while it supports objects of different shapes. Observations can describe bends, creases, tears, and the paper’s condition before and afterward."
+  },
+  {
+    "name": "A Toy Car on a Ramp",
+    "subject": "wheel-motion",
+    "brief": "A small toy car and a wooden ramp are set up on a level floor, with a line marking the ramp’s end. Observers can note the car’s wheel movement, path, and stopping place for different starting positions, with the floor and ramp surface recorded."
+  },
+  {
+    "name": "A Playground Swing",
+    "subject": "pendulum-motion",
+    "brief": "A playground swing hangs from two chains above a clear patch of ground. Observers can describe its position and movement during a gentle push and while it is left alone, noting the seat, chains, and surrounding still air."
+  },
+  {
+    "name": "Marbles on a Sloped Board",
+    "subject": "rolling-motion",
+    "brief": "Glass marbles, a wooden ball, and a small rubber ball are placed on a board that can rest flat or at a gentle slope. Observers can record their paths, turns, and resting places, along with the board’s surface and angle."
+  },
+  {
+    "name": "Moonlit Shapes in a Classroom Model",
+    "subject": "moon-phases",
+    "brief": "Students use a lamp, a white ball and a fixed viewing position to model the Moon. They vary the ball position and viewing direction and describe the illuminated portion without angles or calculations."
+  },
+  {
+    "name": "Water in a Paper Towel",
+    "subject": "absorption",
+    "brief": "A paper towel, a cotton cloth, and a dry sponge rest beside a small tray of colored water. Each material can be touched to the tray and inspected. Observations can describe visible damp areas, color spread, and the condition of the material."
+  },
+  {
+    "name": "Colored Water in a Celery Stalk",
+    "subject": "water-uptake",
+    "brief": "A celery stalk with leaves stands in a clear cup of lightly colored water on a kitchen counter. A second stalk rests nearby in an empty cup. Observers can note the stalk, leaves, cup, and visible color patterns over time."
+  },
+  {
+    "name": "Sugar in Warm and Cool Water",
+    "subject": "dissolving",
+    "brief": "Two clear glasses contain water, one cool and one warm, with teaspoons and small amounts of sugar beside them. Observers can describe the appearance of the water and sugar during stirring and after the glasses are left undisturbed."
+  },
+  {
+    "name": "A Jar of Oil and Water",
+    "subject": "liquid-mixtures",
+    "brief": "A sealed clear jar contains water, cooking oil, and a few drops of food coloring. It rests beside an empty jar and a spoon. Observers can describe the visible layers, colors, and arrangement before and after the jar is gently moved."
+  },
+  {
+    "name": "A Metal Jar Lid in Warm Water",
+    "subject": "thermal-expansion",
+    "brief": "A tightly closed glass jar with a metal lid sits beside a bowl of warm tap water and a towel. Observers can note the jar and lid’s visible condition, the water temperature by touch, and the ease of turning the lid at different moments."
+  },
+  {
+    "name": "A Mug Cooling on a Table",
+    "subject": "cooling",
+    "brief": "A freshly filled mug of hot chocolate stands on a kitchen table beside an empty mug and a room-temperature spoon. Observers can note warmth by careful adult handling, visible steam, and changes in the drink’s appearance as the room remains otherwise undisturbed."
+  },
+  {
+    "name": "An Ice Cube on a Plate",
+    "subject": "melting",
+    "brief": "A single ice cube rests on a plate in a room, while another cube is held in a freezer tray nearby. Observations can describe the cube’s shape, wetness, and size over time, along with the plate and surrounding room conditions."
+  },
+  {
+    "name": "Red Cabbage Indicator",
+    "subject": "acid-base-indicators",
+    "brief": "A class adds cabbage indicator to familiar diluted liquids and compares the visible colors. Questions involve qualitative changes in preparation and mixing, without formulas, pH calculations or tasting."
+  },
+  {
+    "name": "Mixing Paint Colors",
+    "subject": "color-mixing",
+    "brief": "Small amounts of red, blue, and yellow washable paint sit on a white palette beside clean brushes and paper. Observers can describe the colors of the original dabs and the new patches made by mixing different amounts, keeping each patch separate."
+  },
+  {
+    "name": "A Magnifying Glass in Sunlight",
+    "subject": "lenses",
+    "brief": "A handheld magnifying glass, a printed page, and a pale wall are placed near a bright window. Observers can compare how letters and wall patterns look through the glass from different distances, while keeping the lens position and daylight in view."
+  },
+  {
+    "name": "A Straw in a Glass of Water",
+    "subject": "refraction",
+    "brief": "A clear straw stands in a glass of water on a level table, with a second empty glass beside it. Observers can compare the visible straw and objects behind each glass from several viewing positions, noting the water line and the shape of the glass."
+  },
+  {
+    "name": "A Balloon and a Bottle",
+    "subject": "air-pressure",
+    "brief": "An uninflated balloon is fitted over the opening of an empty plastic bottle. A second bottle and loose balloon sit nearby. Observers can note the shapes of both bottles and balloons during gentle handling, with the bottle openings and surrounding air conditions visible."
+  },
+  {
+    "name": "Wind on a Paper Pinwheel",
+    "subject": "wind-driven-motion",
+    "brief": "A paper pinwheel stands in a garden beside a still ribbon and a small flag. Observers can describe the pinwheel’s position and movement, along with the visible motion of the other objects, the surrounding plants, and the weather at different times."
+  },
+  {
+    "name": "A Pulley on a Laundry Line",
+    "subject": "pulleys",
+    "brief": "A simple pulley hangs from a sturdy outdoor support, with a short rope and an empty laundry basket. Observers can note the rope’s path, the basket’s position, and the movement of the pulley wheel during careful lifting and lowering."
+  },
+  {
+    "name": "A Spring Doorstop",
+    "subject": "springiness",
+    "brief": "A coiled metal doorstop is fixed to a baseboard beside a flexible plastic ruler and a soft foam ball. Observers can describe their shapes and visible movement during gentle presses, then note their appearance after they are left untouched."
+  },
+  {
+    "name": "A Rope Pulled Between Posts",
+    "subject": "tension",
+    "brief": "A length of rope is tied between two low posts in an open yard, with a loose rope laid nearby. Observers can describe the rope’s curve, the positions of the posts, and the visible shape of the line under different gentle arrangements."
+  },
+  {
+    "name": "A Seedling in a Clear Pot",
+    "subject": "root-growth",
+    "brief": "A young radish plant grows in a clear pot filled with damp soil, set inside a larger opaque sleeve that can be moved aside for viewing. Observers can note visible roots, leaves, and soil, along with the plant’s appearance on later days."
+  },
+  {
+    "name": "Yeast Dough in a Bowl",
+    "subject": "fermentation",
+    "brief": "A bowl of yeast dough rests under a clean cloth on a kitchen counter, with an empty bowl and a small jar of yeast nearby. Observers can describe the dough’s surface, size, texture, and smell at intervals while noting the room conditions."
+  },
+  {
+    "name": "Rock Samples in Moving Water",
+    "subject": "rock-weathering",
+    "brief": "Students compare rounded and angular rock samples in trays with gentle water movement. Grain size, water motion and exposed surfaces vary, and questions concern visible weathering and fragments."
+  },
+  {
+    "name": "Leaves in a Pond Microhabitat",
+    "subject": "decomposition",
+    "brief": "Students compare fallen leaves of one species in clear pond-water containers. Light, water movement and exposure vary, and they observe leaf color, texture and visible breakdown."
+  },
+  {
+    "name": "Puddles After a Rain Shower",
+    "subject": "surface-drainage",
+    "brief": "Several shallow puddles form on a paved path near a patch of grass, a storm drain, and a slight dip in the ground. Observers can note their outlines, depth by appearance, and changes over time, along with cloud cover and the path’s surface."
+  },
+  {
+    "name": "Salt Crystals on a Dish",
+    "subject": "crystallization",
+    "brief": "Salt water sits in a shallow dish on a shelf beside an empty dish and a small jar of salt. Observers can describe the liquid’s appearance and any visible solid material on the dish during regular checks, noting the room’s light and air conditions."
+  },
+  {
+    "name": "Paper Chromatography",
+    "subject": "chromatography",
+    "brief": "Students place washable ink spots on paper strips that touch water. Paper texture, water contact and ink placement vary; observations concern the movement and separation of colored bands."
+  },
+  {
+    "name": "A Candle and Its Flame",
+    "subject": "combustion",
+    "brief": "A short candle in a stable holder sits on a clear, heat-safe surface in a draft-free room, supervised by an adult. Observers can describe the flame’s shape, the candle’s length, and the wax’s visible state from a safe distance."
+  },
+  {
+    "name": "Iron Nails in Test Tubes",
+    "subject": "corrosion",
+    "brief": "A class observes iron nails in clear containers with different exposure to water and air. Students describe changes in surface color, texture and patches over time."
+  },
+  {
+    "name": "A Bird at a Garden Feeder",
+    "subject": "bird-behavior",
+    "brief": "A single house sparrow visits a garden feeder beside a hedge and a low fence. Observations can include the bird’s arrival and departure times, position, visible movements, and the feeder’s condition, while noting nearby weather and activity without disturbing the bird."
+  },
+  {
+    "name": "A Snail on a Garden Path",
+    "subject": "snail-behavior",
+    "brief": "One common garden snail is observed on a damp stone path beside moss, fallen leaves, and a low garden wall. Notes can describe its position, visible movement, shell orientation, and the path’s dampness and surface features at separate observation times."
+  },
+  {
+    "name": "A Drop of Dye in Water",
+    "subject": "diffusion",
+    "brief": "Students place a drop of food coloring in a clear container. Water temperature, stillness and placement vary; they observe the shape and spread of color without measuring rates."
+  },
+  {
+    "name": "Earthworms in a Leaf-Litter Box",
+    "subject": "earthworm-behavior",
+    "brief": "Earthworms occupy a clear-sided box with loose soil, leaf litter and shaded cover. Soil dampness, litter thickness, surface light and nearby disturbance vary. Observable responses include burrow entry, surface movement, body posture, clustering, retreat direction and leaf handling."
+  },
+  {
+    "name": "Woodlice Beneath Garden Tiles",
+    "subject": "woodlouse-behavior",
+    "brief": "Woodlice move among overturned tiles, bark pieces and bare soil in a garden corner. Shade, surface dampness, shelter width and the presence of other woodlice differ between patches. Their routes, pauses, clustering, turning and choice of cover can be observed."
+  },
+  {
+    "name": "Ants Along a Fallen Branch",
+    "subject": "ant-trails",
+    "brief": "Ants travel along a fallen branch between a nest opening and scattered food crumbs. The route includes rough bark, a fork, a narrow gap and exposed ground. Crumb size, branch dampness, shade and nearby traffic vary; carrying posture, path choice, pauses and encounters are visible."
+  },
+  {
+    "name": "A Spider Web Between Stems",
+    "subject": "spider-webs",
+    "brief": "A small orb web stretches between plant stems in a sheltered garden. The web experiences breeze, dew and occasional contact with fallen plant fragments. Strand position, web shape, the spider's location, movement direction and repair activity can be described alongside the surrounding conditions."
+  },
+  {
+    "name": "Pillbugs and Millipedes in a Terrarium",
+    "subject": "litter-animal-movement",
+    "brief": "A classroom terrarium contains pillbugs and millipedes among bark, dry leaves and moist soil. Cover height, leaf arrangement, surface texture and light differ across the enclosure. Visible responses include movement direction, body position, shelter use, spacing and pauses."
+  },
+  {
+    "name": "Duckweed on a Still Pond",
+    "subject": "floating-plant-growth",
+    "brief": "Duckweed floats in patches near the edge of a still pond. Shade, surface disturbance, open-water gaps and proximity to reeds vary. Over several days observers can describe patch shape, frond color, overlap, root position and movement along the bank."
+  },
+  {
+    "name": "Moss on a Garden Wall",
+    "subject": "moss-moisture",
+    "brief": "Moss grows in separate patches across rough stone and mortar on a garden wall. Sun exposure, rain shelter, cracks and surface dampness differ. Patch outline, shoot posture, color, visible water retention and the appearance of patch edges can be observed."
+  },
+  {
+    "name": "Mushrooms Beneath a Fallen Log",
+    "subject": "fungal-fruiting",
+    "brief": "Small mushrooms emerge from leaf litter near a fallen log. Shelter, litter dampness, spacing and contact with decaying wood vary. Across several days the cap shape, edge position, stalk posture, surface color and visible grouping of mushrooms can be described."
+  },
+  {
+    "name": "A Vine Climbing a Trellis",
+    "subject": "climbing-plants",
+    "brief": "A climbing vine grows beside a trellis with upright rods, crossing strings and open gaps. Support thickness, light direction, nearby contact and available space vary. Tendril shape, wrapping direction, shoot orientation, leaf position and attachment points are visible."
+  },
+  {
+    "name": "Grass Recovering After Footsteps",
+    "subject": "plant-recovery",
+    "brief": "Patches of lawn beside a path differ in shade, soil dampness and frequency of foot traffic. Flattened and upright grass blades can be followed over several days. Blade posture, patch outline, color, spacing and the position of new shoots are observable."
+  },
+  {
+    "name": "Pine Cones on a Sheltered Shelf",
+    "subject": "cone-opening",
+    "brief": "Pine cones rest on an outdoor shelf with both sheltered and exposed sections. Air dampness, surface wetness, cone orientation and contact with the shelf vary. Observers can compare scale opening, cone outline, retained droplets and changes near the cone tips and bases."
+  },
+  {
+    "name": "Cut Flowers in Narrow Vases",
+    "subject": "cut-flower-changes",
+    "brief": "Cut flowers stand in narrow vases at different places in a room. Water appearance, stem crowding, light direction and distance from a draft vary. Petal posture, leaf position, stem bending, flower orientation and visible changes near the water surface can be followed."
+  },
+  {
+    "name": "Bread Slices Left to Dry",
+    "subject": "food-drying",
+    "brief": "Bread slices lie on trays with different exposure to moving air and different coverings. Slice thickness, contact with the tray and initial surface dampness vary. Curling, crust texture, crumb firmness, edge appearance and the location of visible cracks can be described without tasting."
+  },
+  {
+    "name": "An Apple Slice Exposed to Air",
+    "subject": "fruit-browning",
+    "brief": "Fresh apple slices rest on plates with portions covered, dampened or left exposed. Skin edges, cut surfaces, slice thickness and contact with the plate differ. Over time observers can describe surface color, edge curling, moisture patches and the distribution of visible changes."
+  },
+  {
+    "name": "Soap Films Across Wire Loops",
+    "subject": "soap-films",
+    "brief": "Soap films span wire loops held upright or tilted above a shallow tray. Loop shape, surrounding air movement, nearby droplets and film position vary. Visible color bands, sagging, thinning patches, edge drainage and the location of breaks can be followed."
+  },
+  {
+    "name": "Droplets on a Spider-Silk Thread",
+    "subject": "droplet-shapes",
+    "brief": "Water droplets cling along fine threads stretched between supports. Thread inclination, nearby droplet spacing, surface disturbance and contact with small fibers vary. Droplet shape, position, merging, movement and detachment can be observed."
+  },
+  {
+    "name": "Honey Flowing from a Spoon",
+    "subject": "viscous-flow",
+    "brief": "Honey drips from a spoon above a plate in a warm room or a cooler corner. Spoon tilt, distance above the plate, surface texture and the amount remaining on the spoon vary. Stream shape, coiling, spreading, stretching and the location of breaks are visible."
+  },
+  {
+    "name": "Cornstarch Paste Under Gentle Pressure",
+    "subject": "paste-response",
+    "brief": "A shallow bowl holds cornstarch paste with patches of different apparent dampness. A spoon presses, lifts or moves across the surface. Contact shape, motion direction, resting time and closeness to the bowl edge vary; ridges, cracks, trails and surface recovery can be observed."
+  },
+  {
+    "name": "Wet Clay Around a Wooden Form",
+    "subject": "clay-drying",
+    "brief": "Soft clay is shaped around simple wooden forms and left under different coverings. Wall thickness, exposed edges, support contact and surface dampness vary. Changes in shape, edge lifting, crack position, surface texture and attachment to the form can be followed."
+  },
+  {
+    "name": "A Sponge Squeezed Above a Tray",
+    "subject": "porous-material-response",
+    "brief": "Sponges with different pore appearances hold water above a shallow tray. Hand position, sponge orientation, initial wetness and contact area vary. Shape changes, dripping locations, surface bubbles and recovery after release are visible."
+  },
+  {
+    "name": "A Rubber Band Around Pegs",
+    "subject": "elastic-shapes",
+    "brief": "Rubber bands stretch around arrangements of smooth pegs on a board. Peg spacing, corner shape, band thickness and sideways contact vary. Observers can describe band shape, local narrowing, slipping, vibration and recovery when a peg is moved."
+  },
+  {
+    "name": "A Spinning Top on Different Surfaces",
+    "subject": "rotational-stability",
+    "brief": "A toy top spins on smooth, textured and slightly sloped surfaces. The starting tilt, contact point, nearby ridges and surface material differ. Wobble, travel path, leaning direction, contact marks and the manner of coming to rest can be observed."
+  },
+  {
+    "name": "A Paper Helicopter Falling Indoors",
+    "subject": "falling-paper",
+    "brief": "Folded paper helicopters fall through still air or a mild indoor draft. Wing fold, paper stiffness, initial orientation and proximity to a wall vary. Rotation direction, sideways drift, flutter, body tilt and landing posture are visible without timing the fall."
+  },
+  {
+    "name": "A Balloon Rubbing Against Fabric",
+    "subject": "static-attraction",
+    "brief": "Balloons are rubbed against different dry or damp fabrics near small paper scraps and hanging threads. Surface texture, contact area, nearby objects and air dampness vary. Attraction, separation, thread direction, paper movement and attachment location can be observed."
+  },
+  {
+    "name": "A Drumhead Sprinkled with Rice",
+    "subject": "membrane-vibration",
+    "brief": "A drumhead carries a few dry rice grains and is tapped at different positions. Membrane tension, grain location, rim contact and tapping position vary. Grain movement, clustering, bouncing and resting locations are visible alongside the membrane's shape."
+  },
+  {
+    "name": "A Reed Whistle in Moving Air",
+    "subject": "air-driven-vibration",
+    "brief": "A simple reed whistle is exposed to gentle streams of air. Reed position, opening shape, surrounding shelter and moisture on the reed vary. Audible tone character, visible flutter, interruptions and reed contact can be described without numerical pitch measurements."
+  },
+  {
+    "name": "Fabric Draped Across a Clothesline",
+    "subject": "fabric-motion",
+    "brief": "Fabric pieces hang from a line with different clipping positions and folds. Breeze direction, fabric dampness, spacing and material stiffness vary. Flapping, twisting, sagging, contact between folds and the positions of loose corners are visible."
+  },
+  {
+    "name": "A Sand Arch in a Small Mold",
+    "subject": "granular-cohesion",
+    "brief": "Damp sand is shaped into small arches and mounds using open molds. Grain texture, dampness, support width and nearby disturbance vary. Crumbling, surface slumping, crack locations, edge rounding and the way material falls can be observed."
+  },
+  {
+    "name": "Water Passing Through Layered Filters",
+    "subject": "filtration",
+    "brief": "Cloudy water passes through clear containers holding layers of gravel, sand and cloth. Layer arrangement, visible grain texture, water entry position and initial wetness differ. Flow paths, trapped particles, surface pooling and the appearance of water below each layer are visible."
+  },
+  {
+    "name": "An Eggshell in a Clear Liquid",
+    "subject": "shell-reaction",
+    "brief": "Empty eggshell pieces rest in clear liquids in open cups. Shell surface condition, exposed edges, liquid movement and the presence of a covering membrane vary. Bubbles, surface roughness, fragment shape, floating pieces and changes near cracks can be described without handling or tasting the liquids."
+  },
+  {
+    "name": "A Gelatin Sheet in Water",
+    "subject": "gel-swelling",
+    "brief": "Thin gelatin sheets rest partly or fully in shallow water. Sheet thickness, folded edges, contact with the dish and exposed dry portions differ. Curling, transparency, swelling, softening and the movement of folds can be observed over time."
+  },
+  {
+    "name": "A Prism Casting Colored Light",
+    "subject": "light-dispersion",
+    "brief": "A clear prism stands between a light source and a pale screen. Prism orientation, screen position, partial shading and the width of the incoming light patch vary. Observers can describe colored band order, patch shape, edge sharpness and the direction in which the light pattern moves."
+  }
+]

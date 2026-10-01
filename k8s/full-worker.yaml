@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: systems-bench-full
+  namespace: default
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    node-role.kubernetes.io/cpu: ""
+  containers:
+    - name: benchmark
+      image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+      command: [sleep, infinity]
+      env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef: {name: api-keys, key: HF_TOKEN}
+        - {name: HF_HOME, value: /mnt/shared/nc-synthetic-data/cache/huggingface}
+        - {name: PIP_CACHE_DIR, value: /mnt/shared/nc-synthetic-data/cache/pip}
+        - {name: PYTHONUNBUFFERED, value: "1"}
+      resources:
+        requests: {cpu: "4", memory: 8Gi}
+        limits: {memory: 32Gi}
+      volumeMounts:
+        - {name: shared, mountPath: /mnt/shared}
+  volumes:
+    - name: shared
+      hostPath: {path: /mnt/shared, type: Directory}

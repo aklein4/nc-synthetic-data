@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata: {name: systems-bench, namespace: default}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {app: systems-bench}
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        node-role.kubernetes.io/cpu: ""
+      containers:
+        - name: benchmark
+          image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+          command: [bash, -euo, pipefail, -c]
+          args:
+            - |
+              ROOT=/mnt/shared/nc-synthetic-data
+              mkdir -p "$ROOT/control" "$ROOT/logs" "$ROOT/cache" "$ROOT/models" "$ROOT/runs"
+              echo "Waiting for benchmark code and RUN marker on shared storage."
+              until [ -f "$ROOT/control/RUN" ] && [ -f "$ROOT/code/scripts/benchmark.sh" ]; do sleep 5; done
+              mkdir -p "$ROOT/runs/$RUN_NAME"
+              bash "$ROOT/code/scripts/benchmark.sh" 2>&1 | tee -a "$ROOT/runs/$RUN_NAME/benchmark.log"
+          env:
+            - {name: RUN_NAME, value: bean-seedling-256-100}
+            - {name: SUBJECT, value: plant-growth}
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: api-keys, key: HF_TOKEN, optional: true}
+            - {name: HF_HOME, value: /mnt/shared/nc-synthetic-data/cache/huggingface}
+            - {name: PIP_CACHE_DIR, value: /mnt/shared/nc-synthetic-data/cache/pip}
+          resources:
+            requests: {cpu: "4", memory: 8Gi}
+            limits: {memory: 32Gi}
+          volumeMounts:
+            - {name: shared, mountPath: /mnt/shared}
+      volumes:
+        - name: shared
+          hostPath: {path: /mnt/shared, type: Directory}

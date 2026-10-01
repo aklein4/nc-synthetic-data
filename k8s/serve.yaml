@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mimo-serve
+  namespace: default
+spec:
+  backoffLimit: 2
+  podReplacementPolicy: Failed
+  podFailurePolicy:
+    rules:
+      - action: Ignore
+        onPodConditions:
+          - {type: DisruptionTarget, status: "True"}
+      - action: Ignore
+        onExitCodes: {operator: In, values: [143]}
+  template:
+    metadata:
+      labels: {app: mimo-serve}
+    spec:
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 60
+      nodeSelector:
+        node-role.kubernetes.io/gpu-worker: ""
+      tolerations:
+        - {key: amd.com/gpu, operator: Exists, effect: NoSchedule}
+      containers:
+        - name: server
+          image: vllm/vllm-openai-rocm@sha256:e3fdfb382f2b567718ab6de49a14f5d5695dad84efc6dfd9c38f661b1a763e19
+          command: [bash, -euo, pipefail, -c]
+          args:
+            - |
+              ROOT=/mnt/shared/nc-synthetic-data
+              mkdir -p "$ROOT/logs"
+              exec > >(tee -a "$ROOT/logs/serve-$(date -u +%Y%m%dT%H%M%SZ).log") 2>&1
+              echo "Holding eight GPUs until the serving script and START marker are ready."
+              until [ -f "$ROOT/control/START" ] && [ -f "$ROOT/code/scripts/serve.sh" ]; do sleep 5; done
+              exec bash "$ROOT/code/scripts/serve.sh"
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef: {name: api-keys, key: HF_TOKEN, optional: true}
+          resources:
+            requests: {amd.com/gpu: "8", cpu: "32", memory: 512Gi}
+            limits: {amd.com/gpu: "8"}
+          ports: [{name: http, containerPort: 8000}]
+          securityContext:
+            capabilities: {add: [SYS_PTRACE]}
+            seccompProfile: {type: Unconfined}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - {name: shared, mountPath: /mnt/shared}
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: shared
+          hostPath: {path: /mnt/shared, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 32Gi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mimo, namespace: default}
+spec:
+  selector: {app: mimo-serve}
+  ports: [{port: 8000, targetPort: 8000}]
+  type: ClusterIP
