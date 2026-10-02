@@ -286,3 +286,27 @@ training/test candidate pool or generation counters, and are not sent into
 question-generation or revision prompts. Revision feedback includes per-rule
 flags and reasons only. Failed per-rule collision evidence follows the existing
 collision-failure revision path. The fresh-run launcher uses these checks; the stopped historical run is unchanged.
+
+## Data explorer
+
+`explorer/` serves a read-only web explorer for a completed run. It walks
+through the setting, world-building attempts, roles, every sampled question
+draft (generation, five answers, checks, and the final dataset entry) and every
+retained model call in `filtered_audit/`. It uses only the Python standard
+library:
+
+```sh
+nohup python3 explorer/server.py --port 8765 > local_data/explorer/server.log 2>&1 &
+# then open http://<host-ip>:8765/
+```
+
+The first start builds `local_data/explorer/<run>.sqlite` (about one minute,
+2.7 GB); `--rebuild` forces a rebuild and `--run` selects another run directory.
+The original checkpoint isn't stored locally, so `explorer/reconstruct.py`
+recovers structure from request contents: settings by shared background,
+attempts through the revision feedback in each plan prompt, and answer worlds by
+description text. Answer-only checks are matched by prompt and timing, because
+their prompts omit the question and the audit filter may label identical
+requests with another draft. Rejection reasons are recomputed with the frozen
+acceptance logic. The build asserts that all 64 gold worlds match the dataset,
+and it reports any recomputed verdict that disagrees with the run (zero for v56).

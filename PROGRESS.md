@@ -258,3 +258,21 @@
   but not sufficient. Verifier must also judge whole-system predictive differences,
   matching factors, interactions/exceptions and semantic incompatibility. Overall
   distinct=false still rejects even when all per-rule flags are true.
+
+- Full v56 completed 64 rows (16,384 train / 6,400 test) and uploaded to
+  aklein4/AlwaysLearningBench-v1 at commit 3f59ce209d6b5ec3afb585d7602760a803036233.
+- User stopped the raw audit transfer. Filtered actual API attempts with
+  scripts/filter_audit.py: all accepted questions, first up to 10 rejected
+  drafts per rule of each final row, and all world-building attempts. Removed
+  reasoning; mixed generation outputs explicitly filtered/re-encoded. Original
+  usage counters still include thinking/excluded outputs; token IDs unavailable.
+- Copied and fully validated filtered_audit/ locally: 302,476 records, 22,784
+  accepted questions, 9,871 rejected examples. SHA256 matches shared archive.
+  Removed the partial local raw api_audit/ and unfiltered checkpoint.json;
+  complete originals remain on shared storage. Dataset/review/code retained.
+  GPU server and bid remain running; full CPU worker was removed by launcher.
+- 2026-10-02: Added read-only `explorer/` web server for the v56 run (stdlib only).
+  It rebuilds structure from `filtered_audit/` into `local_data/explorer/*.sqlite`.
+  All 64 gold worlds match the dataset; all 32,655 sampled drafts' recomputed
+  verdicts match accepted/rejected status; every accepted item maps to its
+  published options and correct answer. No run artifacts were modified.

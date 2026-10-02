@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SystemsBench Data Explorer</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2;
+  --card: #ffffff;
+  --sunk: #f8f8f6;
+  --border: #dddcd7;
+  --border-strong: #b9b8b1;
+  --text: #1b1b1a;
+  --muted: #5d5c57;
+  --faint: #8a8981;
+  --accent: #2a78d6;
+  --accent-bg: #e8f1fc;
+  --gold: #8a5a00;
+  --gold-bg: #fcf1d9;
+  --gold-border: #e2b54c;
+  --qw: #4a3aa7;
+  --qw-bg: #eeebfa;
+  --qw-border: #a79ce0;
+  --good: #0b7a0b;
+  --good-bg: #e6f4e6;
+  --bad: #b42828;
+  --bad-bg: #fbe9e9;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #141413; --card: #1d1d1c; --sunk: #232321; --border: #33332f; --border-strong: #55554f;
+    --text: #ececea; --muted: #b3b2aa; --faint: #8a8981; --accent: #5c9ded; --accent-bg: #1c2b3d;
+    --gold: #f0c463; --gold-bg: #3a2e12; --gold-border: #8f6d1f; --qw: #b3a9f2; --qw-bg: #2a2545; --qw-border: #5f53a8;
+    --good: #5cc75c; --good-bg: #1b2e1b; --bad: #f07a7a; --bad-bg: #3a1f1f;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141413; --card: #1d1d1c; --sunk: #232321; --border: #33332f; --border-strong: #55554f;
+  --text: #ececea; --muted: #b3b2aa; --faint: #8a8981; --accent: #5c9ded; --accent-bg: #1c2b3d;
+  --gold: #f0c463; --gold-bg: #3a2e12; --gold-border: #8f6d1f; --qw: #b3a9f2; --qw-bg: #2a2545; --qw-border: #5f53a8;
+  --good: #5cc75c; --good-bg: #1b2e1b; --bad: #f07a7a; --bad-bg: #3a1f1f;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button, select, input { font: inherit; color: inherit; }
+h1, h2, h3, h4 { margin: 0; font-weight: 600; }
+h2 { font-size: 18px; }
+h3 { font-size: 15px; }
+p { margin: 0 0 8px; }
+pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 12.5px/1.5 var(--mono); }
+code { font: 12.5px var(--mono); }
+
+/* Layout */
+.app { display: grid; grid-template-columns: 200px minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); height: 100vh; }
+header { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--card); border-bottom: 1px solid var(--border); }
+header .title { font-weight: 600; white-space: nowrap; }
+header .picker { display: flex; align-items: center; gap: 6px; margin-left: auto; min-width: 0; }
+header select { max-width: 420px; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--card); }
+.btn { border: 1px solid var(--border-strong); background: var(--card); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.btn:hover { background: var(--sunk); }
+.btn.small { padding: 1px 7px; font-size: 12px; }
+nav { border-right: 1px solid var(--border); background: var(--card); padding: 12px 8px; overflow-y: auto; }
+nav a { display: block; padding: 7px 10px; border-radius: 6px; color: var(--text); margin-bottom: 2px; }
+nav a:hover { background: var(--sunk); text-decoration: none; }
+nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+nav a.minor { color: var(--muted); font-size: 13px; padding: 5px 10px; }
+nav a.minor.active { color: var(--accent); }
+nav a.disabled { color: var(--faint); pointer-events: none; }
+nav .group { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); padding: 16px 10px 6px; }
+main { overflow-y: auto; padding: 18px 22px 40px; min-width: 0; }
+main.split { overflow: hidden; padding: 0; display: flex; flex-direction: column; }
+.top { padding: 16px 22px 10px; }
+
+/* Building blocks */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+.card + .card { margin-top: 12px; }
+.intro { max-width: 900px; color: var(--muted); margin: 4px 0 14px; }
+.page-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.page-head .meta { color: var(--muted); }
+.row { display: flex; gap: 12px; align-items: center; }
+.grow { flex: 1; min-width: 0; }
+.muted { color: var(--muted); }
+.faint { color: var(--faint); }
+.small { font-size: 12.5px; }
+.badge { display: inline-flex; align-items: center; padding: 0 7px; border-radius: 10px; font-size: 11.5px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; line-height: 18px; }
+.badge.gold { background: var(--gold-bg); color: var(--gold); border-color: var(--gold-border); }
+.badge.qw { background: var(--qw-bg); color: var(--qw); border-color: var(--qw-border); }
+.badge.neutral { background: var(--sunk); color: var(--muted); border-color: var(--border); }
+.ok { color: var(--good); font-weight: 600; }
+.no { color: var(--bad); font-weight: 600; }
+.chip { display: inline-block; padding: 0 7px; border-radius: 4px; background: var(--sunk); border: 1px solid var(--border); font-size: 12px; margin: 1px 2px 1px 0; color: var(--muted); }
+.lab { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin: 0 0 4px; font-weight: 600; }
+.call-link { font-size: 12px; cursor: pointer; color: var(--accent); white-space: nowrap; border: 0; background: none; padding: 0; }
+.call-link:hover { text-decoration: underline; }
+details > summary { cursor: pointer; color: var(--accent); font-size: 12.5px; list-style: none; }
+details > summary::before { content: "▸ "; }
+details[open] > summary::before { content: "▾ "; }
+details > summary::-webkit-details-marker { display: none; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--sunk); position: sticky; top: 0; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--sunk); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; background: var(--card); padding: 3px 10px; cursor: pointer; border-right: 1px solid var(--border); font-size: 13px; }
+.seg button:last-child { border-right: 0; }
+.seg button.sel { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.empty { color: var(--faint); padding: 30px; text-align: center; }
+.optletter { display: inline-block; flex: none; width: 22px; height: 22px; line-height: 20px; text-align: center; border: 1px solid var(--border-strong); border-radius: 4px; font-weight: 700; font-size: 12px; background: var(--card); }
+.optletter.correct { background: var(--good-bg); border-color: var(--good); color: var(--good); }
+
+/* Diagrams */
+svg.diagram { width: 100%; height: auto; display: block; }
+.d-box { fill: var(--card); stroke: var(--border-strong); stroke-width: 1.2; }
+.d-box.gold { fill: var(--gold-bg); stroke: var(--gold-border); }
+.d-box.qw { fill: var(--qw-bg); stroke: var(--qw-border); }
+.d-box.sunk { fill: var(--sunk); }
+.d-loop { fill: none; stroke: var(--border-strong); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.d-title { font-size: 13px; font-weight: 600; fill: var(--text); }
+.d-text { font-size: 12.5px; fill: var(--text); }
+.d-sub { font-size: 11.5px; fill: var(--muted); }
+.d-num { font-size: 11px; font-weight: 700; fill: var(--card); }
+.d-numc { fill: var(--text); }
+.d-arrow { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.d-arrow.back { stroke-dasharray: 4 3; }
+.d-head { fill: var(--muted); }
+svg a:hover .d-box { stroke: var(--accent); stroke-width: 2; }
+.steps { margin: 0; padding-left: 20px; }
+.steps li { margin-bottom: 6px; break-inside: avoid; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+
+/* Overview rows */
+.rowgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+.rowgrid a { display: block; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); }
+.rowgrid a:hover { border-color: var(--accent); text-decoration: none; }
+.rowgrid .n { color: var(--faint); font-size: 12px; margin-right: 6px; }
+
+/* Two-pane pages */
+.pane { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 14px; flex: 1; min-height: 0; padding: 0 22px 16px; }
+.side { overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+.side button { display: flex; gap: 8px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--border); background: none; padding: 7px 10px; cursor: pointer; }
+.side button:hover { background: var(--sunk); }
+.side button.sel { background: var(--accent-bg); }
+.side .rn { font-weight: 600; font-size: 12px; color: var(--muted); width: 20px; flex: none; padding-top: 1px; }
+.side .ra { font-size: 13px; flex: 1; }
+.side .rc { font-size: 12px; color: var(--faint); flex: none; padding-top: 1px; }
+.content { overflow-y: auto; min-height: 0; padding-right: 4px; }
+.rule-text { background: var(--card); border: 1px solid var(--gold-border); border-radius: 8px; padding: 10px 14px; margin: 8px 0; }
+.qcard { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
+.qcard .q { font-weight: 600; margin: 2px 0 6px; }
+.opts { margin: 0; padding: 0; list-style: none; }
+.opts li { display: flex; gap: 8px; padding: 2px 0; align-items: baseline; }
+.opts .src { margin-left: auto; font-size: 12px; color: var(--faint); white-space: nowrap; padding-left: 12px; }
+
+/* Worlds */
+.attempts { display: flex; align-items: stretch; overflow-x: auto; margin: 10px 0; }
+.attempt { border: 1px solid var(--border); background: var(--card); border-radius: 6px; padding: 3px 10px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.attempt.sel { border-color: var(--accent); background: var(--accent-bg); }
+.attempt-arrow { align-self: center; color: var(--faint); padding: 0 6px; }
+.wcols { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.wcol { border: 1px solid var(--border); border-radius: 8px; background: var(--card); display: flex; flex-direction: column; min-width: 0; }
+.wcol.gold { border-color: var(--gold-border); }
+.wcol.qw { border-color: var(--qw-border); }
+.wcol .wh { padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--sunk); border-radius: 8px 8px 0 0; font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.wcol.gold .wh { background: var(--gold-bg); }
+.wcol.qw .wh { background: var(--qw-bg); }
+.wcol .wb { padding: 8px 10px; font-size: 13px; flex: 1; }
+.plan-text { color: var(--muted); font-size: 12.5px; border-left: 2px solid var(--border); padding-left: 8px; margin-bottom: 8px; }
+.answer-text { font-weight: 500; }
+
+/* Trace */
+.qlayout { display: grid; grid-template-columns: 340px minmax(0, 1fr); flex: 1; min-height: 0; }
+.qside { border-right: 1px solid var(--border); background: var(--card); display: flex; flex-direction: column; min-height: 0; }
+.qfilters { padding: 10px 12px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.qfilters select, .qfilters input { width: 100%; padding: 4px 6px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--card); font-size: 12.5px; }
+.qfilters .full { grid-column: 1 / 3; }
+.qlist { overflow-y: auto; flex: 1; }
+.qitem { display: block; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; }
+.qitem:hover { background: var(--sunk); text-decoration: none; }
+.qitem.sel { background: var(--accent-bg); }
+.qitem .qt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.qmain { overflow-y: auto; padding: 14px 18px 40px; min-width: 0; }
+.tsec { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+.tsec h3 { margin-bottom: 8px; }
+.question-text { font-size: 15px; font-weight: 500; margin: 2px 0 6px; }
+.checks td { font-size: 13px; }
+.verdict { margin-top: 10px; padding: 7px 12px; border-radius: 6px; }
+.verdict.good { background: var(--good-bg); color: var(--good); }
+.verdict.bad { background: var(--bad-bg); color: var(--bad); }
+
+/* Drawer */
+.drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,.28); z-index: 10; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(960px, 92vw); background: var(--bg); border-left: 1px solid var(--border-strong); z-index: 11; display: flex; flex-direction: column; }
+.drawer .dh { padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+.drawer .db { overflow-y: auto; padding: 14px 16px 40px; }
+.msg { border: 1px solid var(--border); border-radius: 8px; background: var(--card); margin-top: 12px; }
+.msg .mh { padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--sunk); font-size: 12px; font-weight: 600; border-radius: 8px 8px 0 0; }
+.msg pre { padding: 10px 12px; }
+
+@media (max-width: 1100px) {
+  .wcols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; height: auto; }
+  header { flex-wrap: wrap; padding: 8px 16px; }
+  header .picker { margin-left: 0; width: 100%; }
+  header select { flex: 1; min-width: 0; }
+  nav { display: flex; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--border); }
+  nav .group { display: none; }
+  main { padding: 12px 16px 40px; }
+  main.split { overflow: visible; }
+  .pane, .qlayout { grid-template-columns: minmax(0, 1fr); padding: 0 16px 16px; }
+  .side, .qside { max-height: 40vh; }
+  .wcols { grid-template-columns: minmax(0, 1fr); }
+  .card:has(> svg.diagram) { overflow-x: auto; }
+  svg.diagram { min-width: 900px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="title">SystemsBench data explorer</span>
+    <span class="picker">
+      <button class="btn small" id="prev" title="Previous row">◀</button>
+      <select id="rowpick"></select>
+      <button class="btn small" id="next" title="Next row">▶</button>
+    </span>
+  </header>
+  <nav id="nav"></nav>
+  <main id="main"><div class="empty">Loading…</div></main>
+</div>
+<div id="drawer-root"></div>
+
+<script>
+"use strict";
+const LETTERS = "ABCD";
+const REASONS = {
+  duplicate_answers: "Options not distinct",
+  answer_only: "Guessable without question",
+  language: "Language check",
+  identical_answers: "Identical options",
+  answer_validation: "Gold verification",
+  unanswerable: "A world couldn't answer",
+  answer_length: "Answer too long",
+  text_format: "Formatting",
+};
+
+/* ---------- Helpers ---------- */
+const cache = new Map();
+async function api(path) {
+  if (!cache.has(path)) {
+    cache.set(path, fetch("/api/" + path).then(r => {
+      if (!r.ok) throw new Error(path + ": HTTP " + r.status);
+      return r.json();
+    }));
+  }
+  try { return await cache.get(path); } catch (e) { cache.delete(path); throw e; }
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const fmt = n => (n ?? 0).toLocaleString("en-US");
+const tick = v => v ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+const errText = c => (c.error || c.finish_reason || "no response").replace(/:\s*$/, "");
+function dur(s) {
+  if (s == null) return "—";
+  if (s < 60) return s.toFixed(1) + "s";
+  const m = Math.floor(s / 60), h = Math.floor(m / 60);
+  return h ? `${h}h ${String(m % 60).padStart(2, "0")}m` : `${m}m ${String(Math.round(s % 60)).padStart(2, "0")}s`;
+}
+const callLink = (ids, text = "call") => {
+  ids = [].concat(ids || []).filter(x => x != null);
+  return ids.length ? `<button class="call-link" data-calls="${ids.join(",")}">${esc(text)}</button>` : "";
+};
+function role(info, w) {
+  if (info.gold == null) return "";
+  return w === info.gold ? "gold" : w === info.question_world ? "qw" : "";
+}
+function roleBadge(info, w) {
+  const r = role(info, w);
+  if (r === "gold") return `<span class="badge gold" title="Published as the row's World; its answers are correct">Gold</span>`;
+  if (r === "qw") return `<span class="badge qw" title="Questions are written from its rules; its answers are never options">Writer</span>`;
+  return "";
+}
+const worldName = (info, w) => `World ${w + 1}${w === info.gold ? " (gold)" : w === info.question_world ? " (writer)" : ""}`;
+
+/* ---------- Routing ---------- */
+const state = { overview: null, ui: { rule: {}, attempt: {}, dataMode: "rule", split: "", showSources: false, showOthers: false, showPlans: false, showRules: false, qfilter: {}, callStage: "", callLimit: 400 } };
+
+function parseRoute() {
+  const [path, query] = location.hash.replace(/^#\/?/, "").split("?");
+  const parts = path.split("/").filter(Boolean);
+  const params = Object.fromEntries(new URLSearchParams(query || ""));
+  if (parts[0] === "row") return { kind: "row", row: +parts[1], tab: parts[2] || "data", param: parts[3], params };
+  if (parts[0] === "discarded") return { kind: "discarded", sid: +parts[1], tab: parts[2] || "worlds", params };
+  return { kind: "overview", params };
+}
+function subjectOf(route) {
+  const O = state.overview;
+  if (route.kind === "row") {
+    const r = O.rows[route.row];
+    return { ...r, sid: r.setting, base: `#/row/${route.row}`, final: true, label: `Row ${route.row + 1}` };
+  }
+  if (route.kind === "discarded") {
+    const d = O.discarded.find(x => x.setting === route.sid);
+    return { ...d, sid: d.setting, base: `#/discarded/${route.sid}`, final: false, label: "Discarded" };
+  }
+  return null;
+}
+
+function renderHeader(route) {
+  const O = state.overview;
+  const pick = document.getElementById("rowpick");
+  if (!pick.options.length) {
+    pick.innerHTML = `<option value="#/overview">Overview</option><optgroup label="Rows">` +
+      O.rows.map(r => `<option value="#/row/${r.row}">Row ${r.row + 1} · ${esc(r.name)}</option>`).join("") +
+      `</optgroup><optgroup label="Discarded settings">` +
+      O.discarded.map(d => `<option value="#/discarded/${d.setting}">${esc(d.name)}</option>`).join("") + `</optgroup>`;
+    pick.onchange = () => {
+      const r = parseRoute();
+      const discarded = pick.value.startsWith("#/discarded");
+      const tab = r.tab && !(discarded && ["data", "traces"].includes(r.tab)) ? "/" + r.tab : "";
+      location.hash = pick.value + (pick.value === "#/overview" ? "" : tab);
+    };
+    const step = d => () => {
+      const r = parseRoute();
+      const n = r.kind === "row" ? (r.row + d + O.rows.length) % O.rows.length : 0;
+      location.hash = `#/row/${n}/${r.kind === "row" ? r.tab : "data"}`;
+    };
+    document.getElementById("prev").onclick = step(-1);
+    document.getElementById("next").onclick = step(1);
+  }
+  pick.value = route.kind === "row" ? `#/row/${route.row}` : route.kind === "discarded" ? `#/discarded/${route.sid}` : "#/overview";
+}
+
+function renderNav(route) {
+  const subj = subjectOf(route) || subjectOf({ kind: "row", row: 0 });
+  const t = route.kind === "overview" ? "" : route.tab;
+  const a = (tab, text, minor, disabled) =>
+    `<a href="${subj.base}/${tab}" class="${t === tab ? "active" : ""} ${minor ? "minor" : ""} ${disabled ? "disabled" : ""}">${text}</a>`;
+  document.getElementById("nav").innerHTML =
+    `<a href="#/overview" class="${route.kind === "overview" ? "active" : ""}">Pipeline overview</a>` +
+    `<div class="group">${esc(subj.label)} · ${esc(subj.name)}</div>` +
+    a("data", "Data by rule", false, !subj.final) +
+    a("worlds", "How the worlds were built") +
+    `<div class="group">Details</div>` +
+    a("traces", "Question traces", true, !subj.final) +
+    a("calls", "Model calls", true);
+}
+
+async function render() {
+  const route = parseRoute();
+  closeDrawer();
+  if (route.params.call) openCall(route.params.call.split(",").map(Number));
+  renderHeader(route);
+  renderNav(route);
+  const main = document.getElementById("main");
+  main.className = "";
+  try {
+    if (route.kind === "overview") return renderOverview(main);
+    const subj = subjectOf(route);
+    if (route.tab === "data") return await renderData(main, subj);
+    if (route.tab === "worlds") return await renderWorlds(main, subj);
+    if (route.tab === "traces") return await renderTraces(main, subj, route);
+    if (route.tab === "calls") return await renderCalls(main, subj);
+    location.hash = subj.base + (subj.final ? "/data" : "/worlds");
+  } catch (e) {
+    main.innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+    console.error(e);
+  }
+}
+
+/* ---------- Overview ---------- */
+function pipelineSVG(base) {
+  const box = (x, y, w, h, cls = "") => `<rect class="d-box ${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>`;
+  const num = (x, y, k) => `<circle cx="${x}" cy="${y}" r="9" class="d-numc"/><text class="d-num" x="${x}" y="${y + 4}" text-anchor="middle">${k}</text>`;
+  const txt = (x, y, s, cls = "d-text", anchor = "start") => `<text class="${cls}" x="${x}" y="${y}" text-anchor="${anchor}">${esc(s)}</text>`;
+  const arrow = (x1, y1, x2, y2) => `<path class="d-arrow" d="M${x1},${y1} L${x2},${y2}" marker-end="url(#ah)"/>`;
+  const link = (href, inner) => `<a href="${href}">${inner}</a>`;
+  const step = (href, x, w, k, title, sub, cls = "") => link(href, box(x, 92, w, 76, cls) + num(x + 16, 112, k) + txt(x + 30, 116, title, "d-title") + sub.map((l, i) => txt(x + 12, 140 + i * 16, l, "d-sub")).join(""));
+  const inner = (href, x, y, w, label) => link(href, box(x, y, w, 40, "sunk") + txt(x + 12, y + 25, label));
+  return `<svg class="diagram" viewBox="0 0 1200 250" role="img" aria-label="Pipeline diagram">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  ${step(base + "/worlds", 8, 128, 1, "Idea", ["a short brief"])}
+  ${arrow(136, 130, 164, 130)}
+  ${step(base + "/worlds", 166, 150, 2, "Setting", ["background +", "16 rule topics"])}
+  ${arrow(316, 130, 344, 130)}
+  <rect class="d-loop" x="346" y="10" width="276" height="230" rx="10"/>
+  ${num(362, 30, 3)}${txt(376, 34, "Five worlds", "d-title")}
+  ${inner(base + "/worlds", 360, 50, 248, "Plan 5 versions of the rules")}
+  ${arrow(484, 90, 484, 106)}
+  ${inner(base + "/worlds", 360, 108, 248, "Write 16 rules per world")}
+  ${arrow(484, 148, 484, 164)}
+  ${inner(base + "/worlds", 360, 166, 248, "Check they're sound and distinct")}
+  <path class="d-arrow back" d="M360,186 L352,186 L352,70 L358,70" marker-end="url(#ah)"/>
+  ${txt(484, 228, "fail → revise", "d-sub", "middle")}
+  ${arrow(622, 130, 650, 130)}
+  ${step(base + "/worlds", 652, 136, 4, "Roles", ["1 gold, 1 writer,", "3 distractors"])}
+  ${arrow(788, 130, 816, 130)}
+  <rect class="d-loop" x="818" y="10" width="252" height="230" rx="10"/>
+  ${num(834, 30, 5)}${txt(848, 34, "Questions", "d-title")}
+  ${inner(base + "/traces", 832, 50, 224, "Writer drafts questions")}
+  ${arrow(944, 90, 944, 106)}
+  ${inner(base + "/traces", 832, 108, 224, "Every world answers")}
+  ${arrow(944, 148, 944, 164)}
+  ${inner(base + "/traces", 832, 166, 224, "Keep if checks pass")}
+  <path class="d-arrow back" d="M1056,186 L1064,186 L1064,70 L1058,70" marker-end="url(#ah)"/>
+  ${txt(944, 228, "until 356 kept", "d-sub", "middle")}
+  ${arrow(1070, 130, 1090, 130)}
+  ${step(base + "/data", 1092, 102, 6, "Row", ["256 train", "100 test"], "gold")}
+</svg>`;
+}
+
+function questionSVG() {
+  const box = (x, y, w, h, cls = "") => `<rect class="d-box ${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>`;
+  const txt = (x, y, s, cls = "d-text", anchor = "start") => `<text class="${cls}" x="${x}" y="${y}" text-anchor="${anchor}">${esc(s)}</text>`;
+  const arrow = d => `<path class="d-arrow" d="${d}" marker-end="url(#ah2)"/>`;
+  const worlds = [["gold", "Gold world's answer", "correct option"], ["", "Distractor world's answer", "wrong option"], ["", "Distractor world's answer", "wrong option"], ["", "Distractor world's answer", "wrong option"], ["qw", "Writer world's answer", "discarded"]];
+  let s = `<svg class="diagram" viewBox="0 0 1000 236" role="img" aria-label="How one question becomes an item">
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  ${box(8, 92, 150, 52, "qw")}${txt(83, 114, "Writer world", "d-title", "middle")}${txt(83, 132, "drafts a question", "d-sub", "middle")}
+  ${arrow("M158,118 L186,118")}
+  ${box(188, 92, 110, 52)}${txt(243, 123, "Question", "d-title", "middle")}`;
+  worlds.forEach(([cls, label, out], i) => {
+    const y = 10 + i * 44;
+    s += arrow(`M298,118 C320,118 320,${y + 18} 350,${y + 18}`);
+    s += box(352, y, 220, 36, cls) + txt(364, y + 23, label);
+    s += txt(584, y + 23, "→ " + out, "d-sub");
+    if (i < 4) s += arrow(`M690,${y + 18} C720,${y + 18} 720,118 748,118`);
+  });
+  s += `${box(750, 84, 230, 68, "gold")}${txt(865, 112, "Item: question + options A–D", "d-title", "middle")}${txt(865, 132, "in shuffled order", "d-sub", "middle")}
+  </svg>`;
+  return s;
+}
+
+function renderOverview(main) {
+  const O = state.overview;
+  main.innerHTML = `
+  <div class="page-head"><h2>How the data was generated</h2></div>
+  <p class="intro">Each row teaches one small made-up science system. The row's <b>World</b> states its rules; its questions test them. Every wrong option is the right answer under a different version of the rules.</p>
+  <div class="card">${pipelineSVG("#/row/0")}</div>
+  <div class="card">
+    <ol class="steps" style="columns: 2 440px; column-gap: 36px">
+      <li><b>Idea → setting.</b> A catalogue idea becomes a shared background and 16 rule topics (what to predict, from which factors).</li>
+      <li><b>Five worlds.</b> Five versions of the 16 rules give different outcomes for the same conditions. Each world must be self-consistent, and the five must disagree on every rule.</li>
+      <li><b>Roles.</b> One world is <span class="badge gold">Gold</span> (it's published), one is the question <span class="badge qw">Writer</span>, three are distractors.</li>
+      <li><b>Questions.</b> The writer drafts a question. Every world answers it from its own rules. The gold and distractor answers become the options. A draft is kept only if the options are distinct and only the gold answer fits the gold world.</li>
+      <li><b>Row.</b> 356 kept questions, split 256 train / 100 test.</li>
+    </ol>
+    <div style="max-width: 1000px; margin: 14px auto 0">${questionSVG()}</div>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:10px">Rows</h3>
+    <div class="rowgrid">${O.rows.map(r => `<a href="#/row/${r.row}/data"><span class="n">${r.row + 1}</span>${esc(r.name)}</a>`).join("")}</div>
+  </div>`;
+}
+
+/* ---------- Data by rule ---------- */
+async function renderData(main, subj) {
+  const [D, S] = await Promise.all([api(`row/${subj.row}/dataset`), api("setting/" + subj.sid)]);
+  const worlds = S.trials[S.trials.length - 1].worlds;
+  const info = { gold: S.gold, question_world: S.question_world };
+  const items = [...D.train_data.map((x, n) => ({ ...x, split: "train", n })), ...D.test_data.map((x, n) => ({ ...x, split: "test", n }))];
+  const byRule = S.requests.map((_, i) => items.filter(x => x.rule === i));
+  const key = subj.sid;
+  const rule = state.ui.rule[key] ?? 0;
+  const ui = state.ui;
+  main.className = "split";
+
+  const head = `<div class="top">
+    <div class="page-head"><h2>${esc(S.idea.name)}</h2><span class="meta">${D.num_train} train · ${D.num_test} test</span></div>
+    <p class="intro clamp" style="margin: 4px 0 10px" title="Click to expand" onclick="this.classList.toggle('clamp')">${esc(S.shared)}</p>
+    <div class="toolbar">
+      <span class="seg"><button data-dmode="rule" class="${ui.dataMode === "rule" ? "sel" : ""}">Questions by rule</button><button data-dmode="world" class="${ui.dataMode === "world" ? "sel" : ""}">Full World text</button></span>
+    </div></div>`;
+
+  let body;
+  if (ui.dataMode === "world") {
+    body = `<div style="overflow-y: auto; flex: 1; padding: 0 22px 20px"><div class="card" style="max-width: 900px">
+      <div class="lab">World field (gold: World ${S.gold + 1})</div>
+      <p>${esc(S.shared)}</p>
+      ${worlds[S.gold].map((p, i) => `<p><b>${i + 1}.</b> ${esc(p)} <a class="small" href="#" data-gorule="${i}">${byRule[i].length} questions →</a></p>`).join("")}
+    </div></div>`;
+  } else {
+    const req = S.requests[rule];
+    const shown = byRule[rule].filter(x => !ui.split || x.split === ui.split);
+    const others = [0, 1, 2, 3, 4].filter(w => w !== S.gold);
+    body = `<div class="pane">
+      <div class="side">${S.requests.map((r, i) => `<button data-rule="${i}" class="${i === rule ? "sel" : ""}"><span class="rn">${i + 1}</span><span class="ra">${esc(r.aspect)}</span><span class="rc">${byRule[i].length}</span></button>`).join("")}</div>
+      <div class="content">
+        <h3>Rule ${rule + 1}: ${esc(req.aspect)}</h3>
+        <div class="small muted" style="margin-top:2px">Decided by ${req.factors.map(f => `<span class="chip">${esc(f)}</span>`).join(" ")}</div>
+        <div class="rule-text">${esc(worlds[S.gold][rule])}</div>
+        <div class="toolbar" style="margin-bottom:10px">
+          <span class="seg"><button data-split="" class="${!ui.split ? "sel" : ""}">All ${byRule[rule].length}</button><button data-split="train" class="${ui.split === "train" ? "sel" : ""}">Train ${byRule[rule].filter(x => x.split === "train").length}</button><button data-split="test" class="${ui.split === "test" ? "sel" : ""}">Test ${byRule[rule].filter(x => x.split === "test").length}</button></span>
+          <label class="small"><input type="checkbox" id="show-sources" ${ui.showSources ? "checked" : ""}> Show which world each option comes from</label>
+          <label class="small"><input type="checkbox" id="show-others" ${ui.showOthers ? "checked" : ""}> Show this rule in the other worlds</label>
+        </div>
+        ${ui.showOthers ? `<div class="wcols" style="grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px">${others.map(w => `<div class="wcol ${role(info, w)}"><div class="wh">World ${w + 1} ${roleBadge(info, w)}</div><div class="wb muted">${esc(worlds[w][rule])}</div></div>`).join("")}</div>` : ""}
+        ${shown.map(x => `<div class="qcard">
+          <div class="row small faint"><span>${x.split} #${x.n + 1}</span><span class="grow"></span><a href="${subj.base}/traces/${x.draft}">how it was made →</a></div>
+          <div class="q">${esc(x.question)}</div>
+          <ol class="opts">${x.options.map((o, i) => `<li><span class="optletter ${i === x.correct_option ? "correct" : ""}">${LETTERS[i]}</span><span>${esc(o)}</span>${ui.showSources ? `<span class="src">${worldName(info, x.option_worlds[i])}</span>` : ""}</li>`).join("")}</ol>
+        </div>`).join("")}
+      </div></div>`;
+  }
+  main.innerHTML = head + body;
+  const rerender = () => renderData(main, subj);
+  main.querySelectorAll("[data-dmode]").forEach(b => b.onclick = () => { ui.dataMode = b.dataset.dmode; rerender(); });
+  main.querySelectorAll("[data-rule]").forEach(b => b.onclick = () => { state.ui.rule[key] = +b.dataset.rule; rerender(); });
+  main.querySelectorAll("[data-gorule]").forEach(b => b.onclick = e => { e.preventDefault(); state.ui.rule[key] = +b.dataset.gorule; ui.dataMode = "rule"; rerender(); });
+  main.querySelectorAll("[data-split]").forEach(b => b.onclick = () => { ui.split = b.dataset.split; rerender(); });
+  const src = main.querySelector("#show-sources"); if (src) src.onchange = () => { ui.showSources = src.checked; rerender(); };
+  const oth = main.querySelector("#show-others"); if (oth) oth.onchange = () => { ui.showOthers = oth.checked; rerender(); };
+}
+
+/* ---------- Worlds ---------- */
+async function renderWorlds(main, subj) {
+  const S = await api("setting/" + subj.sid);
+  const key = subj.sid, ui = state.ui;
+  const last = S.trials.length - 1;
+  const ai = Math.min(ui.attempt[key] ?? last, last);
+  const t = S.trials[ai];
+  const rule = ui.rule[key] ?? 0;
+  const info = ai === last && S.accepted ? { gold: S.gold, question_world: S.question_world } : { gold: null };
+  main.className = "split";
+
+  const attempts = S.trials.map((tr, i) => `${i ? '<span class="attempt-arrow">→</span>' : ""}<button class="attempt ${i === ai ? "sel" : ""}" data-attempt="${i}">Attempt ${i + 1} ${tick(tr.passed)}</button>`).join("") +
+    (S.row == null ? `<span class="attempt-arrow">→</span><span class="attempt no" style="cursor:default" title="${esc(S.discard_reason || "")}">Setting discarded</span>` : "");
+
+  let body;
+  if (!t.plan) {
+    body = `<div style="padding: 0 22px"><div class="card">This attempt's planning call timed out. ${callLink(t.plan_call, "calls")}</div></div>`;
+  } else {
+    const failed = [
+      ...t.consistency_ok.map((ok, w) => ok ? null : `World ${w + 1} isn't self-consistent`),
+      t.collisions_ok ? null : "the worlds don't disagree on every rule",
+    ].filter(Boolean).join("; ");
+    const status = t.passed
+      ? (S.accepted && ai === last ? `<span class="ok">✓ Accepted.</span> Gold is World ${S.gold + 1}; questions are written from World ${S.question_world + 1}.` : '<span class="ok">✓ Passed</span>')
+      : `<span class="no">✗ Failed:</span> ${esc(failed)}.`;
+    const cols = [0, 1, 2, 3, 4].map(w => `<div class="wcol ${role(info, w)}"><div class="wh">World ${w + 1} ${roleBadge(info, w)}<span class="grow"></span>${t.consistency[w] ? `<span title="Consistency: ${esc(t.consistency[w].reason)}">${tick(t.consistency_ok[w])}</span>` : ""}</div>
+      <div class="wb">${ui.showPlans ? `<div class="plan-text">${esc(t.plan[w][rule])}</div>` : ""}${esc(t.worlds[w][rule])}</div></div>`).join("");
+    const ex = t.collisions?.rule_examples?.[rule];
+    body = `<div class="top" style="padding-top:0"><div class="small">${status}</div></div>
+      <div class="pane">
+      <div class="side">${S.requests.map((r, i) => `<button data-rule="${i}" class="${i === rule ? "sel" : ""}"><span class="rn">${i + 1}</span><span class="ra">${esc(r.aspect)}</span></button>`).join("")}</div>
+      <div class="content">
+        <h3>Rule ${rule + 1}: ${esc(S.requests[rule].aspect)}</h3>
+        <div class="small muted" style="margin: 2px 0 10px">Decided by ${S.requests[rule].factors.map(f => `<span class="chip">${esc(f)}</span>`).join(" ")}</div>
+        <div class="wcols">${cols}</div>
+        ${ex && ex.question ? `<div class="card" style="margin-top:10px; padding: 10px 14px">
+          <div class="lab">The check's test question for this rule</div>
+          <div style="font-weight:500; margin-bottom:6px">${esc(ex.question)}</div>
+          <div class="wcols">${ex.answers.map((a, w) => `<div class="small"><span class="faint">World ${w + 1}:</span> ${esc(a)}</div>`).join("")}</div>
+        </div>` : ""}
+      </div></div>`;
+  }
+
+  main.innerHTML = `<div class="top">
+    <div class="page-head"><h2>How the worlds were built</h2><span class="meta">${esc(S.idea.name)}</span></div>
+    <p class="intro" style="margin: 4px 0 6px">Five versions of the same 16 rules. Pick a rule to compare how each world handles it.</p>
+    <details class="small"><summary>Idea and setting</summary><div class="card" style="margin-top:6px; max-width: 900px">
+      <div class="lab">Catalogue idea</div><p>${esc(S.idea.brief)}</p>
+      <div class="lab">Setting (shared by all five worlds)</div><p style="margin:0">${esc(S.shared)}</p></div></details>
+    <div class="toolbar"><div class="attempts">${attempts}</div><span class="grow"></span>
+      <label class="small"><input type="checkbox" id="show-plans" ${ui.showPlans ? "checked" : ""}> Show plans</label></div>
+  </div>${body}`;
+
+  const rerender = () => renderWorlds(main, subj);
+  main.querySelectorAll("[data-attempt]").forEach(b => b.onclick = () => { ui.attempt[key] = +b.dataset.attempt; rerender(); });
+  main.querySelectorAll("[data-rule]").forEach(b => b.onclick = () => { ui.rule[key] = +b.dataset.rule; rerender(); });
+  const sp = main.querySelector("#show-plans"); if (sp) sp.onchange = () => { ui.showPlans = sp.checked; rerender(); };
+}
+
+/* ---------- Question traces (details) ---------- */
+async function renderTraces(main, subj, route) {
+  const [list, S] = await Promise.all([api(`row/${subj.row}/questions`), api("setting/" + subj.sid)]);
+  const f = state.ui.qfilter;
+  if (f.row !== subj.row) Object.assign(f, { row: subj.row, rule: "", status: "accepted", q: "" });
+  const selected = route.param != null ? +route.param : null;
+  main.className = "split";
+  main.innerHTML = `<div class="qlayout">
+    <div class="qside">
+      <div class="qfilters">
+        <select id="f-rule" class="full"><option value="">All rules</option>${S.requests.map((r, i) => `<option value="${i}">Rule ${i + 1}: ${esc(r.aspect)}</option>`).join("")}</select>
+        <select id="f-status"><option value="accepted">Accepted</option><option value="rejected">Rejected (sample)</option><option value="">Both</option></select>
+        <input id="f-q" placeholder="Search">
+      </div>
+      <div class="qlist" id="qlist"></div>
+    </div>
+    <div class="qmain" id="qmain"></div>
+  </div>`;
+  ["rule", "status", "q"].forEach(k => { const el = document.getElementById("f-" + k); el.value = f[k]; el.oninput = () => { f[k] = el.value; drawList(); }; });
+  function drawList() {
+    const q = f.q.toLowerCase();
+    const shown = list.filter(x => (f.rule === "" || x.rule === +f.rule) && (!f.status || x.status === f.status) && (!q || x.question.toLowerCase().includes(q)));
+    document.getElementById("qlist").innerHTML = shown.map(x => `<a class="qitem ${x.id === selected ? "sel" : ""}" href="${subj.base}/traces/${x.id}">
+      <div class="small faint">Rule ${x.rule + 1}${x.status === "accepted" ? "" : ` · <span class="no">${esc(REASONS[x.reason] || x.reason)}</span>`}</div>
+      <div class="qt">${esc(x.question)}</div></a>`).join("") || `<div class="empty">None</div>`;
+  }
+  drawList();
+  const qmain = document.getElementById("qmain");
+  if (selected == null) {
+    qmain.innerHTML = `<h2>Question traces</h2><p class="intro">Pick a question to see how it was written, answered by each world, and checked.</p>`;
+    return;
+  }
+  const D = await api("draft/" + selected);
+  const draw = () => {
+    qmain.innerHTML = renderTrace(D, S);
+    qmain.querySelector("#toggle-rules").onclick = () => { state.ui.showRules = !state.ui.showRules; draw(); };
+  };
+  draw();
+  document.querySelector(".qitem.sel")?.scrollIntoView({ block: "nearest" });
+}
+
+function renderTrace(D, S) {
+  const info = { gold: S.gold, question_world: S.question_world };
+  const final = S.trials[S.trials.length - 1];
+  const order = D.option_worlds;
+  const goldLetter = order ? LETTERS[order.indexOf(S.gold)] : null;
+  const accepted = D.status === "accepted";
+  const C = D.checks, B = D.generation?.batch;
+
+  const answers = [0, 1, 2, 3, 4].map(w => {
+    const r = D.answers[w]?.result;
+    const letter = order && order.includes(w) ? LETTERS[order.indexOf(w)] : null;
+    return `<div class="wcol ${role(info, w)}"><div class="wh">${letter ? `<span class="optletter ${w === S.gold ? "correct" : ""}">${letter}</span>` : ""}World ${w + 1} ${roleBadge(info, w)}</div>
+      <div class="wb">${r ? (r.answerable ? `<div class="answer-text">${esc(r.answer)}</div>` : '<div class="no">Unanswerable</div>') : '<span class="faint">—</span>'}
+      ${state.ui.showRules ? `<div class="small muted" style="margin-top:8px">${esc(final.worlds[w][D.rule])}</div>` : ""}</div></div>`;
+  }).join("");
+
+  const passes = {
+    deduplication: r => Object.values(r).every(Boolean),
+    verify: r => Object.keys(r).filter(k => r[k]).join() === goldLetter,
+    possible: r => { const t = Object.keys(r).filter(k => r[k]); return t.length >= 2 && t.includes(goldLetter); },
+    language: r => Object.values(r).every(Boolean),
+  };
+  const checkRow = (src, label) => C[src] ? `<tr><td>${tick(passes[src](C[src].result))}</td><td>${label}</td><td class="small muted">${src === "language" ? "" : LETTERS.split("").filter(l => C[src].result[l]).join(", ") || "none"}</td><td>${callLink(C[src].attempts)}</td></tr>` : "";
+  const checks = order ? `<table class="checks"><thead><tr><th></th><th>Check</th><th>Options marked true</th><th></th></tr></thead><tbody>
+      ${checkRow("deduplication", "All four options say different things")}
+      ${checkRow("verify", `Given the gold world and question, only ${goldLetter} is correct`)}
+      ${checkRow("possible", "Without the question, at least two options are plausible")}
+      ${checkRow("language", "Plain English, no arithmetic")}
+    </tbody></table>` : "";
+
+  let dataset = "";
+  if (accepted && D.placement) {
+    const P = D.placement;
+    dataset = `<div class="tsec"><h3>4 · In the dataset <span class="small muted" style="font-weight:400">${P.split} #${P.index + 1}, options reshuffled</span></h3>
+      <ol class="opts">${P.options.map((o, i) => `<li><span class="optletter ${i === P.correct_option ? "correct" : ""}">${LETTERS[i]}</span><span>${esc(o)}</span></li>`).join("")}</ol></div>`;
+  }
+
+  return `<div class="tsec"><h3>1 · Written from World ${S.question_world + 1}'s rules ${B ? callLink(B.attempts) : ""}</h3>
+      <div class="question-text">${esc(D.question)}</div>
+      <div class="small muted">Rule ${D.rule + 1}: ${esc(S.requests[D.rule].aspect)}</div></div>
+    <div class="tsec"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">2 · Each world answers from its own rules</h3><span class="grow"></span><button class="btn small" id="toggle-rules">${state.ui.showRules ? "Hide" : "Show"} rule ${D.rule + 1}</button></div>
+      <div class="wcols">${answers}</div></div>
+    <div class="tsec"><h3>3 · Checks</h3>${checks}
+      <div class="verdict ${accepted ? "good" : "bad"}">${accepted ? "✓ Kept" : `✗ Dropped: ${esc(D.reason_detail)}`}</div></div>
+    ${dataset}`;
+}
+
+/* ---------- Model calls (details) ---------- */
+async function renderCalls(main, subj) {
+  main.innerHTML = `<div class="empty">Loading…</div>`;
+  const calls = await api(`setting/${subj.sid}/calls`);
+  const t0 = calls.length ? calls[0].started_at : 0;
+  const stages = [...new Set(calls.map(c => c.stage))];
+  const stage = stages.includes(state.ui.callStage) ? state.ui.callStage : "";
+  const shown = calls.filter(c => !stage || c.stage === stage);
+  const limit = state.ui.callLimit;
+  main.innerHTML = `<div class="page-head"><h2>Model calls</h2><span class="meta">${esc(subj.name)}</span></div>
+    <p class="intro">Every saved request and response for this ${subj.final ? "row" : "setting"}.</p>
+    <div class="toolbar" style="margin-bottom:10px"><select id="c-stage" style="padding:4px 8px; border:1px solid var(--border-strong); border-radius:6px; background:var(--card)"><option value="">All (${fmt(calls.length)})</option>${stages.map(s => `<option value="${s}">${esc(s)} (${fmt(calls.filter(c => c.stage === s).length)})</option>`).join("")}</select></div>
+    <div class="card" style="padding:0"><table><thead><tr><th>Time</th><th>Call</th><th></th><th class="num">Tokens in / out</th></tr></thead><tbody>
+    ${shown.slice(0, limit).map(c => `<tr class="click" data-calls="${c.id}"><td class="small muted">+${dur(c.started_at - t0)}</td><td>${esc(c.label)}</td><td>${c.status_code === 200 && c.finish_reason === "stop" ? "" : `<span class="no small">${esc(errText(c))}</span>`}</td><td class="num small">${fmt(c.prompt_tokens)} / ${fmt(c.completion_tokens)}</td></tr>`).join("")}
+    </tbody></table>
+    ${shown.length > limit ? `<div style="padding:10px"><button class="btn" id="more">Show more</button></div>` : ""}</div>`;
+  const sel = document.getElementById("c-stage");
+  sel.value = stage;
+  sel.onchange = () => { state.ui.callStage = sel.value; state.ui.callLimit = 400; renderCalls(main, subj); };
+  document.getElementById("more")?.addEventListener("click", () => { state.ui.callLimit += 1000; renderCalls(main, subj); });
+}
+
+/* ---------- Call drawer ---------- */
+function closeDrawer() { document.getElementById("drawer-root").innerHTML = ""; }
+async function openCall(ids, index) {
+  const root = document.getElementById("drawer-root");
+  index = index ?? ids.length - 1;
+  root.innerHTML = `<div class="drawer-bg"></div><div class="drawer"><div class="dh"><b>Loading…</b><span class="grow"></span><button class="btn" data-close>Close</button></div></div>`;
+  root.querySelector(".drawer-bg").onclick = closeDrawer;
+  root.querySelector("[data-close]").onclick = closeDrawer;
+  const c = await api("call/" + ids[index]);
+  const rec = c.record, req = rec.request || {}, res = rec.response || {};
+  const choice = (res.choices || [])[0] || {};
+  const user = (req.messages || []).find(m => m.role === "user")?.content || "";
+  const sys = (req.messages || []).find(m => m.role === "system")?.content || "";
+  const content = choice.message?.content;
+  let pretty = content;
+  try { pretty = JSON.stringify(JSON.parse(content), null, 2); } catch (e) { /* keep raw */ }
+  const usage = res.usage || {};
+  const ok = c.status_code === 200 && c.finish_reason === "stop";
+  const tabs = ids.length > 1 ? ids.map((_, i) => `<button class="btn small" data-attempt-i="${i}" style="${i === index ? "border-color: var(--accent); color: var(--accent)" : ""}">Try ${i + 1}</button>`).join("") : "";
+  const notes = [];
+  if (c.reasoning_tokens) notes.push(`${fmt(c.reasoning_tokens)} reasoning tokens not saved.`);
+  const filt = choice.filtering;
+  if (filt && !filt.unparseable_generation_output_omitted && filt.retained_indices.length !== filt.original_question_count)
+    notes.push(`Showing ${filt.retained_indices.length} of ${filt.original_question_count} questions (the rest weren't saved).`);
+  root.querySelector(".drawer").innerHTML = `<div class="dh"><b>${esc(c.label)}</b><span class="small muted">${ok ? "" : `<span class="no">${esc(errText(c))}</span> · `}${fmt(usage.prompt_tokens)} in · ${fmt(usage.completion_tokens)} out · ${dur(c.elapsed)}</span><span class="grow"></span>${tabs}<button class="btn" data-close>Close</button></div>
+    <div class="db">
+      ${notes.map(n => `<div class="small muted">${esc(n)}</div>`).join("")}
+      <div class="msg"><div class="mh">Prompt</div><pre>${esc(user)}</pre></div>
+      <div class="msg"><div class="mh">Response</div><pre>${content == null ? '<span class="faint">none</span>' : esc(pretty)}</pre></div>
+      <details style="margin-top:12px"><summary>system message and raw record</summary><pre class="card" style="margin-top:6px">${esc(sys)}\n\n${esc(JSON.stringify(rec, null, 2))}</pre></details>
+    </div>`;
+  root.querySelectorAll("[data-close]").forEach(b => b.onclick = closeDrawer);
+  root.querySelectorAll("[data-attempt-i]").forEach(b => b.onclick = () => openCall(ids, +b.dataset.attemptI));
+}
+
+document.addEventListener("click", e => {
+  const callEl = e.target.closest("[data-calls]");
+  if (callEl) { e.preventDefault(); openCall(callEl.dataset.calls.split(",").map(Number)); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+window.addEventListener("hashchange", render);
+
+(async () => {
+  state.overview = await api("overview");
+  if (!location.hash) location.hash = "#/overview";
+  else render();
+})();
+</script>
+</body>
+</html>
