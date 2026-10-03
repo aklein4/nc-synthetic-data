@@ -282,6 +282,84 @@ def test_api_payload_cache_and_permanent_errors(tmp_path):
     assert requests[0]["messages"][-1] == dict(role="user", content="Say A")
 
 
+def test_worlds_progress_independently_and_resume(blueprint, tmp_path, monkeypatch):
+    async def run():
+        blocked = asyncio.Event()
+        active = peak = 0
+
+        def counted(function):
+            async def wrapped(*args, **kwargs):
+                nonlocal active, peak
+                active += 1
+                peak = max(peak, active)
+                try:
+                    return await function(*args, **kwargs)
+                finally:
+                    active -= 1
+            return wrapped
+
+        monkeypatch.setattr(b, "prepare_world", counted(b.prepare_world))
+        monkeypatch.setattr(b, "render", counted(b.render))
+
+        class Slow(FakeModels):
+            async def call(self, key, *args, **kwargs):
+                if key in ("0-world-check", "1-train-0-check"):
+                    await blocked.wait()
+                result = await super().call(key, *args, **kwargs)
+                if key == "2-train-0-check":
+                    result["question"]["valid"] = False
+                return result
+
+        args = b.parse_args(["--output-dir", str(tmp_path), "--systems", "3",
+                             "--train", "2", "--test", "1", "--concurrency", "4"])
+        task = asyncio.create_task(b.generate(args, Slow(blueprint)))
+        try:
+            async def progress():
+                while True:
+                    await asyncio.sleep(0)
+                    path = tmp_path / "checkpoint.json"
+                    if path.exists():
+                        rows = json.loads(path.read_text())["systems"]
+                        if len(rows[2]["train"]) == 2 and len(rows[2]["test"]) == 1:
+                            return rows
+            before = await asyncio.wait_for(progress(), 2)
+            assert not before[0]["world"]["graphs"]
+            assert "1-train-0" in before[1]["pending"]
+            assert before[2]["attempts"] == dict(train=3, test=1)
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert active == 0 and peak <= 4
+        models = FakeModels(blueprint)
+        state = await b.generate(args, models)
+        assert state["systems"][2] == before[2]
+        assert all(not key.startswith("2-") for key, _ in models.calls)
+        assert len(b.export(state, tmp_path)) == 3
+        for row in state["systems"]:
+            assert not row["pending"]
+            assert [sum(q["sampling"]["graph"] == g for q in row["train"]) for g in range(8)] == [1,1,0,0,0,0,0,0]
+    asyncio.run(run())
+
+
+def test_api_concurrency_is_global(tmp_path):
+    async def run():
+        active = peak = 0
+        async def respond(request):
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+            return httpx.Response(200, json=dict(choices=[dict(
+                finish_reason="stop", message=dict(content='{"answer":"A"}'))]))
+        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+            models = b.Models(client, tmp_path, 2)
+            await asyncio.gather(*(models.call(f"{i}-answer", "Write A", b.ANSWER) for i in range(8)))
+        assert peak == 2 and active == 0
+    asyncio.run(run())
+
+
 
 
 def test_retry_empty_completion_content(tmp_path, monkeypatch):

@@ -73,8 +73,11 @@ word limits are still checked separately.
 `MODEL` defaults to `mimo-v2.6-flash`. `INFERENCE_API_KEY` is optional. Use
 `--subject mixed` for the existing catalogue, `--concurrency` to bound requests,
 and `--upload owner/dataset` only when a Hub upload is intended.
-Train and test candidates run in one continuously replenished pool. Finished
-candidates are checkpointed immediately; a failed candidate frees its metric
+World preparation and train/test candidates from every world run in one global,
+round-robin pool. A slow world cannot block preparation or examples in other
+worlds. `--concurrency` bounds both the total scheduled tasks and simultaneous API
+requests, rather than multiplying that limit by the number of worlds. Finished
+candidates are checkpointed together after each completion wave; a failed candidate frees its metric
 slot for a replacement without waiting for other requests. Pending reservations
 are checkpointed too, so interruption resumes the same sampled candidates.
 Question writing overlaps with its independent answer-writing sequence; the four
@@ -103,6 +106,27 @@ The local viewer needs only Python's standard library:
 ```sh
 python view_run.py local_data/causal-full-256-100-continuous --port 8765
 ```
+
+To inspect three varied worlds from the completed 64-row run:
+
+```sh
+python view_run.py local_data/alwayslearning-v2-64-256-100-parallel --worlds 7 26 56 --port 8765
+```
+
+These are the weather station, spider web and chromatography worlds. Use the
+header selector to switch rows; each keeps its exact prompts and source calls.
+`--worlds` accepts 1-based row numbers; `--rows N` instead shows the first N rows.
+The viewer filters what is displayed without modifying the dataset.
+
+To share a single offline file, add `--html` instead of starting the server:
+
+```sh
+python view_run.py local_data/alwayslearning-v2-64-256-100-parallel --worlds 26 51 2 --html local_data/SystemsBench-Three-Worlds.html
+```
+
+The HTML embeds the selected examples, graphs, prompts and structured final
+outputs as compressed data. Open it directly in a modern browser; no server or
+network connection is needed. API audits and reasoning traces are not included.
 
 Open **http://localhost:8765**. If Python runs on another machine, forward that
 machine's port 8765 to your browser's machine. The server binds to loopback only.
@@ -179,6 +203,18 @@ bid outside the authorized $3/GPU-hour ceiling, without stopping existing work.
 cannot run cleanup. Check the log's final shutdown confirmation. An interrupted
 run can be resumed with the same name after restarting MiMo and restoring its bid.
 `--run-name NAME` chooses a separate run directory.
+
+The interrupted v2 run has been copied to a separate directory with the parallel
+world scheduler. Resume its preserved examples and cached calls from tmux with:
+
+```sh
+python3 run_publish.py --run-name alwayslearning-v2-64-256-100-parallel
+```
+
+The original run remains unchanged. `scheduler-upgrade.json` records the old/new
+source hashes and compatibility checks; `previous-code/` preserves its original
+source. Only the scheduler changed, with no changes to prompts, model settings,
+world mappings or saved examples. The same upload and GPU cleanup apply.
 
 For runs using `run_full.sh` directly, withdraw the bid separately through the
 National Compute API when no further GPU work is wanted.

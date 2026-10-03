@@ -561,3 +561,53 @@
   and shutdown limitations. Forty tests pass, including eight mocked launcher
   lifecycle cases; shell syntax, help and diff whitespace checks pass. No full
   run, upload, bid mutation or GPU shutdown was executed while preparing this.
+
+## Parallel-world resume
+
+- Stopped the sequential full run at 8 complete worlds plus 234 train / 97 test
+  in world 9 (3179 retained examples, 15 outstanding reservations). The old
+  publication wrapper was stopped for the planned handover; MiMo remains warm.
+- World preparation and candidates now share one round-robin scheduler bounded
+  by the global concurrency setting. An incomplete world no longer blocks later
+  worlds. The existing API semaphore still bounds all overlapping writer calls.
+  Completion waves are checkpointed together to reduce repeated full-state writes.
+- All 42 tests pass, including a blocked world preparation and a blocked QA call
+  while a third world completes, interrupted multi-world resume, and global API
+  concurrency. Publication/upload and GPU-release lifecycle tests still pass.
+- Resume directory: `alwayslearning-v2-64-256-100-parallel`. Compatibility checks
+  establish that only generate() changed; every other top-level definition and
+  all API/catalogue files match. All existing examples pass graph, distractor,
+  verification and uniqueness checks. Original sources are in previous-code/;
+  scheduler-upgrade.json records the source transition. The stopped original
+  remains available. No new generation or upload was started.
+
+## Three-world viewer after full-run completion
+
+- The full 64-row local export and v2 upload receipt are present. Viewer now
+  runs on port 8765 with worlds 7, 26 and 56: weather station, spider web and
+  paper chromatography, following the request to avoid the first three worlds.
+- Added --worlds (1-based explicit selection) and --rows (first N), preserving
+  original model-call indices while filtering display only. All 1068 retained
+  examples in the selection link to their actual model calls; source data is
+  unchanged.
+- Moved the row selector into the header, compacted navigation/descriptions and
+  panel headings, and removed the page width cap. At 1366x768 the dataset
+  workspace grew from 382px to 525px high, with more width as well.
+- Four viewer tests pass. Browser checks cover all five stages for each selected
+  world, gold reveal, test split and graph-path navigation, with no page errors,
+  desktop vertical overflow or mobile horizontal overflow. Screenshots are in
+  local_data/causal-viewer/three-rows-{desktop,mobile}.png. README launch command
+  is updated; diff whitespace checks pass.
+
+## Standalone colleague viewer
+
+- Added --html export to view_run.py. One self-contained HTML embeds the selected
+  summary and final-response call caches as gzip/base64, with offline loading in
+  the same UI. It requires no Python server, network or external assets; audits
+  and reasoning traces are not included. Exact prompts/settings remain available.
+- Created local_data/SystemsBench-Three-Worlds.html (3.0 MB), in requested order:
+  A Spider Web Between Stems, Bean Seedling Growth, A Candle and Its Flame.
+  Each has all 256 train / 100 test examples and the full creation walkthrough.
+- Five viewer tests pass, including export selection, exclusion of audit traces
+  and safe encoding of script-like content. Offline browser checks cover all five
+  stages for all three settings without HTTP requests or browser errors.

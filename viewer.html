@@ -79,9 +79,9 @@ h1 {
 }
 
 h2 {
-  font-size: 23px;
+  font-size: 19px;
   letter-spacing: -.5px;
-  margin-bottom: 5px
+  margin-bottom: 2px
 }
 
 h3 {
@@ -99,13 +99,13 @@ small {
 }
 
 .shell {
-  max-width: 1580px;
+  width: 100%;
   margin: auto;
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: 22px 30px 14px;
-  gap: 17px
+  padding: 12px 18px 8px;
+  gap: 8px
 }
 
 header {
@@ -117,8 +117,12 @@ header {
 
 .run-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 15px
+}
+
+#system-picker select {
+  max-width: min(38vw, 460px)
 }
 
 .stats {
@@ -132,7 +136,7 @@ nav {
   display: flex;
   gap: 5px;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 13px
+  padding-bottom: 5px
 }
 
 nav button {
@@ -178,9 +182,9 @@ nav button span {
 }
 
 .intro p {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
-  max-width: 850px
+  line-height: 1.35
 }
 
 main {
@@ -188,7 +192,7 @@ main {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px
+  gap: 8px
 }
 
 .workspace {
@@ -211,7 +215,7 @@ main {
 }
 
 .panel-head {
-  padding: 13px 18px;
+  padding: 9px 16px;
   border-bottom: 1px solid var(--line);
   display: flex;
   gap: 8px;
@@ -497,6 +501,15 @@ pre {
     display: block
   }
 
+  header {
+    flex-wrap: wrap
+  }
+
+  #system-picker select {
+    max-width: 100%;
+    margin-top: 6px
+  }
+
   .stats {
     gap: 7px
   }
@@ -541,11 +554,11 @@ pre {
 }
 </style>
 <div class="shell">
-  <header><div class="run-title"><h1>SystemsBench</h1><small id="run-name">Run story</small></div><div class="stats"><span id="status"></span><span id="counts"></span><button id="refresh">Refresh</button></div></header>
+  <header><div class="run-title"><h1>SystemsBench</h1><div id="system-picker"></div></div><div class="stats"><span id="status"></span><span id="counts"></span><button id="refresh">Refresh</button></div></header>
   <nav aria-label="Pipeline stages" id="nav"></nav>
   <div id="error" class="notice error" role="alert"></div>
   <main id="main"></main>
-  <div class="footer"><span>Prompts → final model outputs → sampled data. Reasoning traces are not displayed or loaded.</span><span id="model"></span></div>
+  <div class="footer"><span id="run-name">Run story</span><span id="model"></span></div>
 </div>
 <script>
 'use strict';
@@ -565,12 +578,13 @@ let data, stage = 0,
   graphIndex = 0,
   answerIndex = 0,
   worldStep = 'world',
-  questionStep = 'question',
+  questionStep = 'sampling',
   answerStep = 'answers',
   reveal = false,
   rejected = false,
   revision = 0;
 const cache = new Map();
+let embedded;
 
 function button(text, fn, active = false) {
   let b = el('button', active ? 'active' : '', text);
@@ -657,6 +671,7 @@ function item() {
   return list[position]
 }
 async function call(key) {
+  if (embedded) return embedded.calls[key] || null;
   if (!cache.has(key)) {
     let r = await fetch('/api/call?key=' + encodeURIComponent(key));
     if (!r.ok) return null;
@@ -725,6 +740,21 @@ function callInput(c) {
   return fragment
 }
 
+function writerInput(c) {
+  let block = el('div'), inputs = c.inputs;
+  const labels = {setting: 'World', system: 'World', metric: 'Target metric',
+    count: 'Number of names to invent', outcome: 'Assigned outcome', variation: 'Writing style'};
+  block.append(factList(Object.entries(inputs).filter(([k, v]) => typeof v !== 'object')
+    .map(([k, v]) => [labels[k] || k, v])));
+  if (inputs.details) block.append(el('h3', '', 'Facts the question must include'),
+    factList(inputs.details.map(d => [d.attribute, d.value])));
+  let instructions = el('details');
+  instructions.append(el('summary', '', 'Writing instructions sent to the model'),
+    el('p', 'instructions', c.instructions));
+  block.append(instructions, raw('Exact request · messages, schema and settings', c.request));
+  return block
+}
+
 function prettyInput(input) {
   if (typeof input !== 'object' || input === null) return el('p', '', input);
   let block = el('div');
@@ -779,17 +809,20 @@ function resultView(c) {
   if (r.details) return factList(Object.fromEntries(r.details.map(d => [d.attribute, d.value])));
   return el('pre', '', JSON.stringify(r, null, 2))
 }
-async function showCall(key, container, ticket) {
+async function showCall(key, container, ticket, explanation) {
   let c = await call(key);
   if (ticket !== revision) return;
   if (!c) {
     container.append(el('div', 'empty', 'This call has not completed yet.'));
     return
   }
-  let [left, lb] = panel('What went into the model', badge(c.request.chat_template_kwargs
+  let [left, lb] = panel(explanation?.inputTitle || 'What went into the model', badge(c.request.chat_template_kwargs
     ?.enable_thinking ? 'Reasoning on' : 'Reasoning off'));
-  let [right, rb] = panel('What came out', badge('Final output'));
-  lb.append(callInput(c));
+  let [right, rb] = panel(explanation?.outputTitle || 'What came out', badge('Final output'));
+  if (explanation) {
+    lb.append(el('p', 'notice', explanation.input), writerInput(c));
+    rb.append(el('p', 'muted', explanation.output));
+  } else lb.append(callInput(c));
   rb.append(resultView(c), raw('Exact structured output', c.result));
   container.append(left, right)
 }
@@ -825,7 +858,7 @@ function showReview(review, target, question, details) {
   }
 }
 
-function provenance(q) {
+function provenance(q, includeNames = true) {
   let s = q.sampling,
     w = row().world,
     values = {};
@@ -843,7 +876,7 @@ function provenance(q) {
     }
     b.append(el('h3', '', 'Environmental distractor'), factList(d))
   } else b.append(el('p', 'muted', 'No environmental distractor sampled.'));
-  b.append(el('h3', '', 'Acausal names'), factList(Object.fromEntries(s.decorations.map(d => [d
+  if (includeNames) b.append(el('h3', '', 'Acausal names'), factList(Object.fromEntries(s.decorations.map(d => [d
     .attribute, d.value
   ]))));
   return b
@@ -875,20 +908,30 @@ async function draw() {
     nav.append(b)
   });
   let main = $('#main');
+  $('#system-picker').replaceChildren();
   if (!data.systems.length) {
     main.append(el('div', 'empty',
       'World creation is still in progress. Refresh to load the first checkpoint.'));
     return
   }
-  if (data.systems.length > 1) main.append(select(data.systems.map((r, i) => [i, r.world
-    .setting]), system, v => {
+  if (data.systems.length > 1) $('#system-picker').append(select(data.systems.map((r, i) => [i,
+    `${(r.source_index ?? i) + 1} · ${r.world.setting}`]), system, v => {
       system = Number(v);
       position = 0;
+      metric = -1;
+      graphIndex = 0;
+      reveal = false;
       draw()
     }, 'System'));
   let w = row().world;
+  const sourceSystem = row().source_index ?? system;
+  if (!w.graphs.length && stage !== 0) {
+    main.append(el('div', 'empty',
+      'This world is still being prepared. Other worlds can be inspected while it finishes.'));
+    return
+  }
   if (stage === 0) {
-    if (!data.world_calls.includes(system + '-' + worldStep)) worldStep = 'world';
+    if (!data.world_calls.includes(sourceSystem + '-' + worldStep)) worldStep = 'world';
     main.append(description('A vocabulary for the world',
       `${w.setting}. MiMo chooses observable attributes and distinct outcomes; it does not choose the causal relationships.`
       ));
@@ -898,7 +941,7 @@ async function draw() {
         ['world-check', '2 · Review everything'],
         ['world-revise', '3 · Revise together']
       ]) {
-      let exists = data.world_calls.includes(system + '-' + suffix);
+      let exists = data.world_calls.includes(sourceSystem + '-' + suffix);
       if (exists) t.append(button(label, () => {
         worldStep = suffix;
         draw()
@@ -907,7 +950,7 @@ async function draw() {
     main.append(t);
     let workspace = el('div', 'workspace');
     main.append(workspace);
-    await showCall(system + '-' + worldStep, workspace, ticket);
+    await showCall(sourceSystem + '-' + worldStep, workspace, ticket);
     return
   }
   if (stage === 1) {
@@ -949,10 +992,10 @@ async function draw() {
     return
   }
   main.append(description(stage === 2 ? 'Sample facts, then write the question' : stage === 3 ?
-    'Independent answers, one combined check' : 'The data the learner sees', stage === 2 ?
-    'The writer sees the setting, target metric, shuffled facts and a variation. The graph and answer are absent.' :
+    'Write four options, then check the whole example' : 'The data the learner sees', stage === 2 ?
+    'Follow steps 1–3: Python chooses the facts and outcomes; the model invents names and writes a question from those facts.' :
     stage === 3 ?
-    'Each answer receives its own outcome and the same style cue. One later call checks the question, distractors and all four answers.' :
+    'Python chooses one correct outcome and three alternatives. Each gets its own answer-writing call; one verifier then reviews the assembled example.' :
     `${w.setting}. Train and test independently sample the same system; accepted examples are balanced across its eight metrics.`
     ));
   main.append(itemControls());
@@ -996,9 +1039,9 @@ async function draw() {
     'Awaiting verification', q.model_passed === false ? false : undefined));
   if (stage === 2) {
     for (let [v, label] of [
-        ['sampling', '1 · Sample'],
-        ['decorations', '2 · Add names'],
-        ['question', '3 · Write']
+        ['sampling', '1 · Choose facts'],
+        ['decorations', '2 · Invent names'],
+        ['question', '3 · Write question']
       ]) t.append(button(label, () => {
       questionStep = v;
       draw()
@@ -1007,10 +1050,11 @@ async function draw() {
     let workspace = el('div', 'workspace');
     main.append(workspace);
     if (questionStep === 'sampling') {
-      let [left, lb] = panel('Python samples the scenario'), [right, rb] = panel(
-        'Four outcome slots');
+      let [left, lb] = panel('1 · Choose the scenario', badge('Python · no model call')), [right, rb] = panel(
+        'Compute the correct outcome and alternatives');
       if (q.sampling) {
-        lb.append(provenance(q));
+        lb.append(el('p', 'notice', 'Active conditions determine the answer. An environmental distractor describes the world but does not affect this answer.'), provenance(q, false),
+          el('p', 'muted', `Python also requests ${q.sampling.decoration_count} decorative names. Step 2 invents them; they have no effect on any graph.`));
         let s = q.sampling,
           g = w.graphs[s.graph];
         rb.append(el('p', 'notice',
@@ -1026,22 +1070,31 @@ async function draw() {
         lb.append(el('p', 'notice',
           'Sampling metadata is retained in the checkpoint only for accepted examples. The writer input and verification call still show the facts for this candidate.'
           ));
-        rb.append(el('p', 'muted', 'Choose “Write” to inspect its prompt.'))
+        rb.append(el('p', 'muted', 'Choose “Write question” to inspect its prompt.'))
       }
       workspace.append(left, right)
-    } else await showCall(q.key + '-' + questionStep, workspace, ticket);
+    } else await showCall(q.key + '-' + questionStep, workspace, ticket,
+      questionStep === 'decorations' ? {
+        inputTitle: '2 · Input to the name writer', outputTitle: 'Invented names',
+        input: 'This call receives only the world and a count. It invents short names for subjects or places.',
+        output: 'These names become decorative facts in the question. They do not affect the correct outcome.'
+      } : {
+        inputTitle: '3 · Input to the question writer', outputTitle: 'Generated question',
+        input: 'The model receives the facts below, shuffled together, plus a writing style. It does not receive the graph, correct outcome, or answer options.',
+        output: 'The model turns the supplied facts into a word problem. The verifier later checks that every fact survived and no conflicting details were added.'
+      });
     return
   }
-  t.append(button('Answers', () => {
+  t.append(button('1 · Write answer options', () => {
     answerStep = 'answers';
     draw()
-  }, answerStep === 'answers'), button('Combined verification', () => {
+  }, answerStep === 'answers'), button('2 · Verify the example', () => {
     answerStep = 'check';
     draw()
   }, answerStep === 'check'));
   if (answerStep === 'answers') {
     t.append(el('span', 'spacer'));
-    ['A', 'B', 'C', 'D'].forEach((letter, i) => t.append(button(letter, () => {
+    ['A', 'B', 'C', 'D'].forEach((letter, i) => t.append(button('Option ' + letter, () => {
       answerIndex = i;
       draw()
     }, i === answerIndex)))
@@ -1050,7 +1103,11 @@ async function draw() {
   let workspace = el('div', 'workspace');
   main.append(workspace);
   if (answerStep === 'answers') {
-    await showCall(q.key + '-answer-' + answerIndex, workspace, ticket)
+    await showCall(q.key + '-answer-' + answerIndex, workspace, ticket, {
+      inputTitle: 'Input to this answer writer', outputTitle: 'Generated option ' + String.fromCharCode(65 + answerIndex),
+      input: 'Each option is written in a separate call using only its assigned outcome, world, target metric and style. All four calls use the same style; none sees the question or knows which option is correct.',
+      output: 'This short phrase becomes one answer option. Select A–D above to inspect all four calls. Question writing can run at the same time because the writers are independent.'
+    })
   } else {
     let c = await call(q.key + '-check');
     if (ticket !== revision) return;
@@ -1060,12 +1117,19 @@ async function draw() {
     }
     let [left, lb] = panel('What the verifier saw', badge('One call · reasoning ' +
       (c.request.chat_template_kwargs?.enable_thinking ? 'on' : 'off'))), [right, rb] = panel(
-      'Verdicts');
-    lb.append(el('p', 'instructions', c.instructions), el('h3', '', 'Question'), el('p',
+      'Review and retention');
+    lb.append(el('p', 'notice', 'One call checks the question, its required facts and distractor roles, and all four answers paired with their intended outcomes. It checks wording fidelity; Python checks the randomized graph mapping.'), el('h3', '', 'Question to check'), el('p',
       'compact-question', c.inputs.question), factList(Object.fromEntries(c.inputs.answers
       .map((a, i) => [String.fromCharCode(65 + i), a.answer + ' ← ' + a.outcome]))), raw(
       'Exact verifier input', c.inputs), raw('Exact request', c.request));
+    lb.append(el('h3', '', 'Required facts'), factList(c.inputs.specification.details.map(d => [d.attribute, d.value])),
+      raw('Distractor roles supplied to the verifier', c.inputs.distractor_plan),
+      raw('Verification instructions', c.instructions));
+    rb.append(el('p', 'notice', q.verification ? 'Kept in the dataset: model verification and Python checks passed.' :
+      'This candidate is not in the retained dataset. Model verdicts below are only one part of the acceptance decision.'),
+      el('h3', '', 'Model review · all verdicts must pass'));
     showReview(c.result, rb, c.inputs.question, c.inputs.specification.details);
+    rb.append(el('h3', '', 'Python checks · checked separately'));
     if (q.verification) rb.append(el('p', 'notice', q.verification.errors.length ? q.verification
       .errors.join('; ') :
       'Python checks passed: graph consistency, distractor invariance, evidence quotes, lengths and distinct options.'
@@ -1184,9 +1248,20 @@ function graphSvg(world, g, conditions) {
 }
 async function load() {
   try {
-    let r = await fetch('/api/run');
-    if (!r.ok) throw Error('Could not read the run directory.');
-    data = await r.json();
+    const packed = document.getElementById('embedded-data');
+    if (packed) {
+      if (!embedded) {
+        const bytes = Uint8Array.from(atob(packed.textContent.trim()), c => c.charCodeAt(0));
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+        embedded = await new Response(stream).json();
+      }
+      data = embedded.run;
+      $('#refresh').hidden = true;
+    } else {
+      let r = await fetch('/api/run');
+      if (!r.ok) throw Error('Could not read the run directory.');
+      data = await r.json();
+    }
     cache.clear();
     $('#run-name').textContent = data.name;
     $('#status').textContent = data.complete ? 'Complete' :

@@ -380,58 +380,91 @@ async def generate(args, models):
     if state["config"] != config:
         raise ValueError("Run configuration/source changed; use a new output directory")
     seen = {normalized(item["question"]) for row in state["systems"] for split in ("train", "test") for item in row[split]}
-    for index, idea in enumerate(ideas[:args.systems]):
-        if index == len(state["systems"]):
-            world = await prepare_world(models, str(index), idea, args.seed)
-            state["systems"].append(dict(world=world, train=[], test=[], attempts=dict(train=0, test=0)))
+    # Keep stable world indices even when later worlds finish preparation first.
+    for idea in ideas[len(state["systems"]):args.systems]:
+        state["systems"].append(dict(world=dict(setting=idea["name"], inputs=[], graphs=[]),
+                                     train=[], test=[], attempts=dict(train=0, test=0), pending={}))
+    for row in state["systems"]:
+        row.setdefault("pending", {})
+    counts = dict(train=args.train, test=args.test)
+    tasks = {}
+    cursor = 0
+    try:
+        while True:
+            occupied = [{s: [0] * 8 for s in counts} for row in state["systems"]]
+            for index, row in enumerate(state["systems"]):
+                for split in counts:
+                    for item in row[split]:
+                        occupied[index][split][item["sampling"]["graph"]] += 1
+                for job in row["pending"].values():
+                    occupied[index][job["split"]][job["graph"]] += 1
+
+            # One global, round-robin queue for world preparation and candidates.
+            # Reserving quota slots prevents surplus candidates; the API semaphore
+            # also bounds overlapping question/answer calls to the same limit.
+            idle = 0
+            while len(tasks) < args.concurrency and idle < args.systems:
+                index = cursor
+                cursor = (cursor + 1) % args.systems
+                row = state["systems"][index]
+                idle += 1
+                if not row["world"]["graphs"]:
+                    key = f"{index}-prepare"
+                    if key in tasks:
+                        continue
+                    task = asyncio.create_task(prepare_world(models, str(index), ideas[index], args.seed))
+                    tasks[key] = (task, index, None)
+                else:
+                    key = next((k for k in row["pending"] if k not in tasks), None)
+                    if key is None:
+                        available = [(s, g) for s, n in counts.items() for g in range(8)
+                                     if occupied[index][s][g] < n // 8 + (g < n % 8)
+                                     and row["attempts"][s] < n * 10]
+                        if not available:
+                            continue
+                        split, graph = min(available, key=lambda pair: occupied[index][pair[0]][pair[1]])
+                        attempt = row["attempts"][split]
+                        key = f"{index}-{split}-{attempt}"
+                        row["pending"][key] = dict(split=split, graph=graph, attempt=attempt)
+                        row["attempts"][split] += 1
+                        occupied[index][split][graph] += 1
+                    job = row["pending"][key]
+                    spec = sample(row["world"], job["graph"], random.Random(
+                        f"{args.seed}:{index}:{job['split']}:{job['attempt']}"))
+                    tasks[key] = (asyncio.create_task(render(models, key, row["world"], spec)), index, job)
+                idle = 0
+            # Persist finished work and new reservations together before dispatch.
+            # One write per completion wave avoids rewriting 64 worlds per item.
             atomic_json(path, state)
-        row = state["systems"][index]
-        counts = dict(train=args.train, test=args.test)
-        # Reserve each outstanding quota slot; a rejection immediately frees it.
-        # Persist reservations before requests so interrupted calls resume unchanged.
-        pending = row.setdefault("pending", {})
-        tasks = {}
-        try:
-            while any(len(row[s]) < n for s, n in counts.items()):
-                occupied = {(s, g): sum(q["sampling"]["graph"] == g for q in row[s])
-                            + sum(j["split"] == s and j["graph"] == g for j in pending.values())
-                            for s in counts for g in range(8)}
-                while len(pending) < args.concurrency:
-                    available = [(s, g) for s, n in counts.items() for g in range(8)
-                                 if occupied[s, g] < n // 8 + (g < n % 8)
-                                 and row["attempts"][s] < n * 10]
-                    if not available:
-                        break
-                    split, graph = min(available, key=lambda pair: occupied[pair])
-                    attempt = row["attempts"][split]
-                    key = f"{index}-{split}-{attempt}"
-                    pending[key] = dict(split=split, graph=graph, attempt=attempt)
-                    row["attempts"][split] += 1
-                    occupied[split, graph] += 1
-                atomic_json(path, state)
-                for key, job in pending.items():
-                    if key not in tasks and len(tasks) < args.concurrency:
-                        spec = sample(row["world"], job["graph"], random.Random(
-                            f"{args.seed}:{index}:{job['split']}:{job['attempt']}"))
-                        tasks[key] = asyncio.create_task(render(models, key, row["world"], spec))
-                if not tasks:
-                    raise ValueError(f"System {index}: candidate budget exhausted")
-                done, _ = await asyncio.wait(tasks.values(), return_when=asyncio.FIRST_COMPLETED)
-                for key in [key for key, task in tasks.items() if task in done]:
-                    item = tasks[key].result()
-                    split = pending[key]["split"]
-                    text = normalized(item["question"])
-                    if item["verification"]["passed"] and text not in seen:
+            if not tasks:
+                if any(len(row[s]) != n for row in state["systems"] for s, n in counts.items()):
+                    raise ValueError("Candidate budget exhausted")
+                break
+            done, _ = await asyncio.wait([entry[0] for entry in tasks.values()],
+                                         return_when=asyncio.FIRST_COMPLETED)
+            changed = set()
+            for key in [key for key, entry in tasks.items() if entry[0] in done]:
+                task, index, job = tasks[key]
+                result = task.result()
+                row = state["systems"][index]
+                if job is None:
+                    row["world"] = result
+                else:
+                    text = normalized(result["question"])
+                    if result["verification"]["passed"] and text not in seen:
                         seen.add(text)
-                        row[split].append(item)
-                    del pending[key], tasks[key]
-                    atomic_json(path, state)
+                        row[job["split"]].append(result)
+                    del row["pending"][key]
+                del tasks[key]
+                changed.add(index)
+            for index in sorted(changed):
+                row = state["systems"][index]
                 print(f"System {index+1}: train {len(row['train'])}/{args.train}, "
-                      f"test {len(row['test'])}/{args.test}; {len(pending)} in flight", flush=True)
-        finally:
-            for task in tasks.values():
-                task.cancel()
-            await asyncio.gather(*tasks.values(), return_exceptions=True)
+                      f"test {len(row['test'])}/{args.test}; {len(tasks)} tasks across worlds", flush=True)
+    finally:
+        for task, _, _ in tasks.values():
+            task.cancel()
+        await asyncio.gather(*(entry[0] for entry in tasks.values()), return_exceptions=True)
     return state
 
 

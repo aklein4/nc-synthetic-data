@@ -1,13 +1,16 @@
 from functools import partial
+import base64
+import gzip
 from http.server import ThreadingHTTPServer
 import json
+import re
 from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
 import pytest
 
-from view_run import Handler, Run, prompt_parts
+from view_run import Handler, Run, prompt_parts, export_html
 
 
 def save(path, value):
@@ -71,3 +74,40 @@ def test_prompt_json_is_separated_without_losing_content():
     assert instructions == "Instructions with {braces}."
     assert inputs == dict(a="one\ntwo", b=[1, 2])
     assert prompt_parts("No structured input") == ("No structured input", None)
+
+
+def test_row_limit_keeps_original_call_indices_and_source(tmp_path):
+    state = dict(config=dict(systems=4), systems=[dict(train=[], test=[]) for _ in range(4)])
+    save(tmp_path / "checkpoint.json", state)
+    payload = dict(messages=[dict(role="user", content='Write.\n{"metric":"Motion"}')])
+    for i in range(4):
+        save(tmp_path / "calls" / f"{i}-world.json", dict(request=payload, result={}))
+        save(tmp_path / "calls" / f"{i}-train-0-question.json",
+             dict(request=payload, result=dict(question=f"Question {i}?")))
+    summary = Run(tmp_path, rows=3).summary()
+    assert summary["total_systems"] == 4 and len(summary["systems"]) == 3
+    assert summary["world_calls"] == ["0-world", "1-world", "2-world"]
+    assert [c["key"] for c in summary["candidates"]] == [f"{i}-train-0" for i in range(3)]
+    assert json.loads((tmp_path / "checkpoint.json").read_text()) == state
+    selected = Run(tmp_path, worlds=[3, 1]).summary()
+    assert [row["source_index"] for row in selected["systems"]] == [3, 1]
+    assert [(c["system"], c["key"]) for c in selected["candidates"]] == [(0, "3-train-0"), (1, "1-train-0")]
+    assert selected["world_calls"] == ["1-world", "3-world"]
+
+
+def test_standalone_export_embeds_only_selected_final_calls(tmp_path):
+    save(tmp_path / "checkpoint.json", dict(config={}, systems=[dict(train=[], test=[]) for _ in range(2)]))
+    payload = dict(messages=[dict(role="user", content='Write.\n{"setting":"Example"}')])
+    for i in range(2):
+        save(tmp_path / "calls" / f"{i}-world.json",
+             dict(request=payload, result=dict(answer='</script><script>UNSAFE_MARKUP</script>')))
+    save(tmp_path / "api_audit/private.json", dict(reasoning_content="PRIVATE_TRACE"))
+    destination = tmp_path / "viewer.html"
+    export_html(Run(tmp_path, worlds=[1]), destination)
+    html = destination.read_text()
+    encoded = re.search(r'id="embedded-data">([^<]+)</script>', html)[1]
+    data = json.loads(gzip.decompress(base64.b64decode(encoded)))
+    assert list(data["calls"]) == ["1-world"]
+    assert data["run"]["systems"][0]["source_index"] == 1
+    assert "UNSAFE_MARKUP" not in html
+    assert "PRIVATE_TRACE" not in json.dumps(data)
