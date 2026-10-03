@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SystemsBench · Run story</title>
+<style>
+:root {
+  color-scheme: light;
+  --ink: #20302e;
+  --muted: #657670;
+  --line: #dce3dc;
+  --paper: #f5f6f1;
+  --green: #176b56;
+  --wash: #e9f3eb;
+  --gold: #976422
+}
+
+* {
+  box-sizing: border-box
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, sans-serif
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit
+}
+
+button,
+select {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 7px;
+  padding: 7px 12px
+}
+
+button {
+  cursor: pointer
+}
+
+button:hover {
+  border-color: var(--green)
+}
+
+button:disabled {
+  opacity: .4;
+  cursor: default
+}
+
+button.active {
+  background: var(--green);
+  color: white;
+  border-color: var(--green)
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 3px solid #8ac9b6;
+  outline-offset: 2px
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0
+}
+
+h1 {
+  font-size: 21px;
+  letter-spacing: -.5px
+}
+
+h2 {
+  font-size: 23px;
+  letter-spacing: -.5px;
+  margin-bottom: 5px
+}
+
+h3 {
+  font-size: 14px;
+  margin-bottom: 10px
+}
+
+small,
+.muted {
+  color: var(--muted)
+}
+
+small {
+  font-size: 12px
+}
+
+.shell {
+  max-width: 1580px;
+  margin: auto;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 30px 14px;
+  gap: 17px
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px
+}
+
+.run-title {
+  display: flex;
+  align-items: baseline;
+  gap: 15px
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  font-size: 12px
+}
+
+nav {
+  display: flex;
+  gap: 5px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 13px
+}
+
+nav button {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border-color: transparent
+}
+
+nav button span {
+  display: inline-flex;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  width: 21px;
+  height: 21px;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  margin-right: 8px
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  flex-wrap: wrap
+}
+
+.toolbar select {
+  max-width: 330px
+}
+
+.spacer {
+  flex: 1
+}
+
+.intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px
+}
+
+.intro p {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 850px
+}
+
+main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 16px
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden
+}
+
+.panel-head {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between
+}
+
+.panel-body {
+  padding: 20px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1
+}
+
+.panel-body>*+* {
+  margin-top: 15px
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: .7px;
+  text-transform: uppercase
+}
+
+.instructions {
+  font-size: 14px;
+  white-space: pre-wrap;
+  line-height: 1.65
+}
+
+.facts {
+  display: grid;
+  gap: 0
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: minmax(115px, .7fr) minmax(0, 1fr);
+  gap: 18px;
+  padding: 9px 0;
+  border-bottom: 1px solid #edf0ea;
+  font-size: 13px
+}
+
+.fact:last-child {
+  border-bottom: 0
+}
+
+.fact dt {
+  color: var(--muted)
+}
+
+.fact dd {
+  margin: 0;
+  overflow-wrap: anywhere
+}
+
+.fact dd ul {
+  padding-left: 18px;
+  margin: 0
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f0f2ed;
+  color: var(--muted)
+}
+
+.badge.good {
+  background: var(--wash);
+  color: var(--green)
+}
+
+.badge.bad {
+  background: #fff1e7;
+  color: #994b21
+}
+
+.notice {
+  border-left: 3px solid #bdcdbc;
+  padding: 9px 13px;
+  background: #f7f8f3;
+  font-size: 13px;
+  color: var(--muted)
+}
+
+.question {
+  font: 24px/1.5 Georgia, serif;
+  max-width: 850px
+}
+
+.answer {
+  font: 27px/1.4 Georgia, serif
+}
+
+.options {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 0;
+  display: grid;
+  gap: 10px
+}
+
+.options li {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 14px;
+  align-items: baseline
+}
+
+.options li.gold {
+  background: var(--wash);
+  border-color: #86b69c
+}
+
+.letter {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 15px
+}
+
+.option-text {
+  flex: 1
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px
+}
+
+.card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px
+}
+
+.card strong {
+  display: block;
+  margin-bottom: 6px
+}
+
+.card ul {
+  margin: 0;
+  padding-left: 17px
+}
+
+.review {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px
+}
+
+.review p {
+  margin-top: 5px
+}
+
+.review:last-child {
+  border: 0
+}
+
+details {
+  font-size: 12px;
+  color: var(--muted)
+}
+
+summary {
+  cursor: pointer
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.6 ui-monospace, monospace;
+  background: #f5f7f3;
+  padding: 13px;
+  border-radius: 6px;
+  color: var(--ink)
+}
+
+.empty {
+  color: var(--muted);
+  padding: 30px;
+  text-align: center
+}
+
+.graph-layout {
+  grid-template-columns: 260px minmax(0, 1fr)
+}
+
+.graph-layout .panel-body {
+  padding: 14px
+}
+
+.metric-list {
+  display: grid;
+  gap: 4px
+}
+
+.metric-list button {
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 5px 10px
+}
+
+.metric-list button small {
+  display: block;
+  color: inherit;
+  opacity: .75
+}
+
+.graph-wrap {
+  padding: 4px;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center
+}
+
+.graph-wrap svg {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  max-height: 650px
+}
+
+.legend {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 10px 17px;
+  border-top: 1px solid var(--line)
+}
+
+.compact-question {
+  font: 16px/1.5 Georgia, serif
+}
+
+.dataset-layout {
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, .8fr)
+}
+
+.dataset-layout .panel-body {
+  padding: 24px
+}
+
+.footer {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 20px
+}
+
+.error {
+  color: #994b21
+}
+
+#error:empty {
+  display: none
+}
+
+@media(max-width:900px) {
+  .shell {
+    padding: 14px;
+    height: auto;
+    min-height: 100dvh
+  }
+
+  .run-title {
+    display: block
+  }
+
+  .stats {
+    gap: 7px
+  }
+
+  .workspace,
+  .graph-layout,
+  .dataset-layout {
+    grid-template-columns: 1fr
+  }
+
+  .panel-body {
+    max-height: 65vh
+  }
+
+  .graph-wrap {
+    min-height: 460px
+  }
+
+  nav {
+    overflow: auto
+  }
+
+  nav button {
+    min-width: 145px
+  }
+
+  .intro {
+    display: block
+  }
+
+  h2 {
+    font-size: 21px
+  }
+
+  .toolbar select {
+    max-width: 250px
+  }
+
+  .footer {
+    display: block
+  }
+}
+</style>
+<div class="shell">
+  <header><div class="run-title"><h1>SystemsBench</h1><small id="run-name">Run story</small></div><div class="stats"><span id="status"></span><span id="counts"></span><button id="refresh">Refresh</button></div></header>
+  <nav aria-label="Pipeline stages" id="nav"></nav>
+  <div id="error" class="notice error" role="alert"></div>
+  <main id="main"></main>
+  <div class="footer"><span>Prompts → final model outputs → sampled data. Reasoning traces are not displayed or loaded.</span><span id="model"></span></div>
+</div>
+<script>
+'use strict';
+const $ = s => document.querySelector(s),
+  el = (tag, cls, text) => {
+    let n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n
+  };
+const labels = ['World', 'Causal graphs', 'Question', 'Answers & checks', 'Dataset'];
+let data, stage = 0,
+  system = 0,
+  split = 'train',
+  position = 0,
+  metric = -1,
+  graphIndex = 0,
+  answerIndex = 0,
+  worldStep = 'world',
+  questionStep = 'question',
+  answerStep = 'answers',
+  reveal = false,
+  rejected = false,
+  revision = 0;
+const cache = new Map();
+
+function button(text, fn, active = false) {
+  let b = el('button', active ? 'active' : '', text);
+  b.onclick = fn;
+  return b
+}
+
+function select(options, value, fn, label) {
+  let s = el('select');
+  s.setAttribute('aria-label', label);
+  for (let [v, t] of options) {
+    let o = el('option', '', t);
+    o.value = v;
+    s.append(o)
+  }
+  s.value = value;
+  s.onchange = () => fn(s.value);
+  return s
+}
+
+function raw(title, value) {
+  let d = el('details');
+  d.append(el('summary', '', title), el('pre', '', JSON.stringify(value, null, 2)));
+  return d
+}
+
+function badge(text, good) {
+  return el('span', 'badge' + (good === true ? ' good' : good === false ? ' bad' : ''), text)
+}
+
+function panel(title, tag) {
+  let p = el('section', 'panel'),
+    h = el('div', 'panel-head');
+  h.append(el('h3', '', title));
+  if (tag) h.append(tag);
+  p.append(h);
+  let body = el('div', 'panel-body');
+  p.append(body);
+  return [p, body]
+}
+
+function factList(values) {
+  let dl = el('dl', 'facts');
+  for (let [k, v] of (Array.isArray(values) ? values : Object.entries(values))) {
+    let row = el('div', 'fact'),
+      dd = el('dd');
+    row.append(el('dt', '', k));
+    if (Array.isArray(v)) {
+      let ul = el('ul');
+      v.forEach(x => ul.append(el('li', '', typeof x === 'object' ? JSON.stringify(x) : x)));
+      dd.append(ul)
+    } else dd.textContent = String(v);
+    row.append(dd);
+    dl.append(row)
+  }
+  return dl
+}
+
+function description(title, text) {
+  let n = el('div', 'intro'),
+    wrap = el('div');
+  wrap.append(el('h2', '', title), el('p', '', text));
+  n.append(wrap);
+  return n
+}
+
+function row() {
+  return data.systems[system]
+}
+
+function candidates() {
+  return data.candidates.filter(c => c.system === system && c.split === split && !c.retained && (
+    metric < 0 || c.metric === row().world.graphs[metric].metric))
+}
+
+function items() {
+  return rejected ? candidates() : row()[split].filter(i => metric < 0 || i.sampling.graph ===
+    metric)
+}
+
+function item() {
+  let list = items();
+  position = Math.max(0, Math.min(position, list.length - 1));
+  return list[position]
+}
+async function call(key) {
+  if (!cache.has(key)) {
+    let r = await fetch('/api/call?key=' + encodeURIComponent(key));
+    if (!r.ok) return null;
+    cache.set(key, await r.json())
+  }
+  return cache.get(key)
+}
+
+function itemControls() {
+  let t = el('div', 'toolbar');
+  t.append(select([
+    ['train', 'Training'],
+    ['test', 'Test']
+  ], split, v => {
+    split = v;
+    position = 0;
+    draw()
+  }, 'Split'));
+  t.append(select([
+    [-1, 'All eight metrics'], ...row().world.graphs.map((g, i) => [i, g.metric])
+  ], metric, v => {
+    metric = Number(v);
+    position = 0;
+    draw()
+  }, 'Filter by metric'));
+  if (stage !== 4) t.append(select([
+    ['kept', 'Retained examples'],
+    ['other', 'Other candidates']
+  ], rejected ? 'other' : 'kept', v => {
+    rejected = v === 'other';
+    position = 0;
+    draw()
+  }, 'Candidate status'));
+  let previous = button('←', () => {
+      position--;
+      reveal = false;
+      draw()
+    }),
+    next = button('→', () => {
+      position++;
+      reveal = false;
+      draw()
+    });
+  previous.setAttribute('aria-label', 'Previous example');
+  next.setAttribute('aria-label', 'Next example');
+  previous.disabled = position <= 0;
+  next.disabled = position >= items().length - 1;
+  t.append(el('span', 'spacer'), previous, select(items().map((q, i) => [i,
+    `${i+1} / ${items().length}${rejected?' · #'+q.attempt:''}`
+  ]), position, v => {
+    position = Number(v);
+    reveal = false;
+    draw()
+  }, 'Example'), next);
+  return t
+}
+
+function callInput(c) {
+  let fragment = document.createDocumentFragment();
+  fragment.append(el('div', 'eyebrow', 'Instructions'), el('p', 'instructions', c.instructions));
+  if (c.inputs !== null) {
+    fragment.append(el('div', 'eyebrow', 'Supplied input'));
+    fragment.append(prettyInput(c.inputs))
+  }
+  fragment.append(raw('Exact request · messages, schema and settings', c.request));
+  return fragment
+}
+
+function prettyInput(input) {
+  if (typeof input !== 'object' || input === null) return el('p', '', input);
+  let block = el('div');
+  let scalars = Object.fromEntries(Object.entries(input).filter(([k, v]) => typeof v !== 'object'));
+  block.append(factList(scalars));
+  if (input.details) block.append(factList(input.details.map(d => [d.attribute, d.value])));
+  for (let [key, value] of Object.entries(input)) {
+    if (typeof value === 'object' && key !== 'details') block.append(raw(key.replaceAll('_', ' '),
+      value))
+  }
+  return block
+}
+
+function blueprintView(result) {
+  let wrap = el('div'),
+    tabs = el('div', 'toolbar'),
+    cards = el('div', 'cards');
+
+  function show(field) {
+    tabs.replaceChildren();
+    for (let [f, label] of [
+        ['inputs', 'Input attributes'],
+        ['metrics', 'Output metrics']
+      ]) tabs.append(button(`${label} · ${result[f].length}`, () => show(f), field === f));
+    cards.replaceChildren();
+    for (let v of result[field]) {
+      let c = el('div', 'card');
+      c.append(el('strong', '', v.name));
+      let ul = el('ul');
+      (v.values || v.outcomes).forEach(x => ul.append(el('li', '', x)));
+      c.append(ul);
+      cards.append(c)
+    }
+  }
+  wrap.append(tabs, cards);
+  cards.style.marginTop = '14px';
+  show('inputs');
+  return wrap
+}
+
+function resultView(c) {
+  let r = c.result;
+  if (r.inputs && r.metrics) return blueprintView(r);
+  if ('valid' in r) {
+    let b = el('div');
+    b.append(badge(r.valid ? 'Approved' : 'Revision requested', r.valid), el('p', 'instructions', r
+      .reason));
+    return b
+  }
+  if (r.question) return el('p', 'question', r.question);
+  if (r.answer) return el('p', 'answer', r.answer);
+  if (r.details) return factList(Object.fromEntries(r.details.map(d => [d.attribute, d.value])));
+  return el('pre', '', JSON.stringify(r, null, 2))
+}
+async function showCall(key, container, ticket) {
+  let c = await call(key);
+  if (ticket !== revision) return;
+  if (!c) {
+    container.append(el('div', 'empty', 'This call has not completed yet.'));
+    return
+  }
+  let [left, lb] = panel('What went into the model', badge(c.request.chat_template_kwargs
+    ?.enable_thinking ? 'Reasoning on' : 'Reasoning off'));
+  let [right, rb] = panel('What came out', badge('Final output'));
+  lb.append(callInput(c));
+  rb.append(resultView(c), raw('Exact structured output', c.result));
+  container.append(left, right)
+}
+
+function showReview(review, target, question, details) {
+  const quotes = review.question.evidence || [];
+  const exact = quotes.map(quote => !!quote.trim() && question.includes(quote));
+  const matches = exact.filter(Boolean).length;
+  if (matches < quotes.length) target.append(el('p', 'notice',
+    `${quotes.length - matches} evidence quote(s) are missing or not verbatim in the question. Python rejects these even if the model says “Pass”.`));
+  for (let [name, r] of [
+      ['Question', review.question],
+      ['Distractors', review.distractors], ...review.answers.map((a, i) => ['Answer ' + String
+        .fromCharCode(65 + i), a
+      ])
+    ]) {
+    let div = el('div', 'review');
+    div.append(badge(r.valid ? 'Pass' : 'Fail', r.valid), document.createTextNode(' ' + name), el(
+      'p', '', r.reason));
+    target.append(div)
+  }
+  if (quotes.length) {
+    let d = el('details');
+    d.append(el('summary', '', `Evidence quotes · ${matches}/${quotes.length} exact`));
+    quotes.forEach((quote, i) => {
+      let line = el('div', 'review'), fact = details[i];
+      line.append(badge(exact[i] ? 'Exact match' : 'Mismatch', exact[i]));
+      if (fact) line.append(el('p', '', `${fact.attribute}: ${fact.value}`));
+      line.append(el('p', '', quote || 'No evidence supplied'));
+      d.append(line);
+    });
+    target.append(d)
+  }
+}
+
+function provenance(q) {
+  let s = q.sampling,
+    w = row().world,
+    values = {};
+  for (let [k, v] of Object.entries(s.conditions)) {
+    let a = w.inputs.find(x => x.id === k);
+    values[a.name] = a.values[v]
+  }
+  let b = el('div');
+  b.append(el('h3', '', 'Active causal conditions'), factList(values));
+  if (Object.keys(s.distractors).length) {
+    let d = {};
+    for (let [k, v] of Object.entries(s.distractors)) {
+      let a = w.inputs.find(x => x.id === k);
+      d[a.name] = a.values[v] + (k in w.graphs[s.graph].inputs ? ' · unused second criterion' : '')
+    }
+    b.append(el('h3', '', 'Environmental distractor'), factList(d))
+  } else b.append(el('p', 'muted', 'No environmental distractor sampled.'));
+  b.append(el('h3', '', 'Acausal names'), factList(Object.fromEntries(s.decorations.map(d => [d
+    .attribute, d.value
+  ]))));
+  return b
+}
+
+function optionList(q, show) {
+  let list = el('ol', 'options');
+  q.options.forEach((a, i) => {
+    let li = el('li', show && i === q.correct_option ? 'gold' : '');
+    li.append(el('span', 'letter', String.fromCharCode(65 + i)), el('span', 'option-text', a));
+    if (show && i === q.correct_option) li.append(badge('Correct', true));
+    list.append(li)
+  });
+  return list
+}
+async function draw() {
+  const ticket = ++revision;
+  $('#main').replaceChildren();
+  $('#error').textContent = '';
+  let nav = $('#nav');
+  nav.replaceChildren();
+  labels.forEach((label, i) => {
+    let b = button('', () => {
+      stage = i;
+      if (i === 4) rejected = false;
+      draw()
+    }, i === stage);
+    b.append(el('span', '', i + 1), document.createTextNode(label));
+    nav.append(b)
+  });
+  let main = $('#main');
+  if (!data.systems.length) {
+    main.append(el('div', 'empty',
+      'World creation is still in progress. Refresh to load the first checkpoint.'));
+    return
+  }
+  if (data.systems.length > 1) main.append(select(data.systems.map((r, i) => [i, r.world
+    .setting]), system, v => {
+      system = Number(v);
+      position = 0;
+      draw()
+    }, 'System'));
+  let w = row().world;
+  if (stage === 0) {
+    if (!data.world_calls.includes(system + '-' + worldStep)) worldStep = 'world';
+    main.append(description('A vocabulary for the world',
+      `${w.setting}. MiMo chooses observable attributes and distinct outcomes; it does not choose the causal relationships.`
+      ));
+    let t = el('div', 'toolbar');
+    for (let [suffix, label] of [
+        ['world', '1 · Draft'],
+        ['world-check', '2 · Review everything'],
+        ['world-revise', '3 · Revise together']
+      ]) {
+      let exists = data.world_calls.includes(system + '-' + suffix);
+      if (exists) t.append(button(label, () => {
+        worldStep = suffix;
+        draw()
+      }, worldStep === suffix))
+    }
+    main.append(t);
+    let workspace = el('div', 'workspace');
+    main.append(workspace);
+    await showCall(system + '-' + worldStep, workspace, ticket);
+    return
+  }
+  if (stage === 1) {
+    main.append(description('Random mappings make the system',
+      'Python assigns outcomes to graph slots independently of their meaning. A first criterion either gives the result directly or routes through a second criterion.'
+      ));
+    let workspace = el('div', 'workspace graph-layout'),
+      [left, lb] = panel('Eight output metrics'),
+      [right, rb] = panel(w.graphs[graphIndex].metric);
+    let menu = el('div', 'metric-list');
+    w.graphs.forEach((g, i) => {
+      let b = button('', () => {
+        graphIndex = i;
+        draw()
+      }, i === graphIndex);
+      b.append(document.createTextNode(g.metric), el('small', '',
+        `${g.outcomes.length} outcomes · ${g.nodes.length} intermediate${g.nodes.length===1?'':'s'}`
+        ));
+      menu.append(b)
+    });
+    lb.append(menu, raw('Exact graph', w.graphs[graphIndex]));
+    let current = item(),
+      example = current?.sampling?.graph === graphIndex ? current : null;
+    right.removeChild(rb);
+    let wrap = el('div', 'graph-wrap');
+    wrap.append(graphSvg(w, w.graphs[graphIndex], example?.sampling.conditions));
+    right.append(wrap);
+    let legend = el('div', 'legend');
+    legend.append(el('span', '', 'Gray: all possible routes'));
+    if (example) legend.append(el('span', '', 'Green: selected example'));
+    right.append(legend);
+    if (example) {
+      let note = el('div', 'panel-head');
+      note.append(el('p', 'compact-question', example.question));
+      right.append(note)
+    }
+    workspace.append(left, right);
+    main.append(workspace);
+    return
+  }
+  main.append(description(stage === 2 ? 'Sample facts, then write the question' : stage === 3 ?
+    'Independent answers, one combined check' : 'The data the learner sees', stage === 2 ?
+    'The writer sees the setting, target metric, shuffled facts and a variation. The graph and answer are absent.' :
+    stage === 3 ?
+    'Each answer receives its own outcome and the same style cue. One later call checks the question, distractors and all four answers.' :
+    `${w.setting}. Train and test independently sample the same system; accepted examples are balanced across its eight metrics.`
+    ));
+  main.append(itemControls());
+  let q = item();
+  if (!q) {
+    main.append(el('div', 'empty', 'No examples in this selection yet.'));
+    return
+  }
+  if (stage === 4) {
+    let workspace = el('div', 'workspace dataset-layout'),
+      [left, lb] = panel(`${split==='train'?'Training':'Test'} example`, badge('Verified', true)),
+      [right, rb] = panel('How this example was made');
+    lb.append(el('p', 'question', q.question), optionList(q, reveal), button(reveal ?
+      'Hide correct answer' : 'Reveal correct answer', () => {
+        reveal = !reveal;
+        draw()
+      }));
+    let s = q.sampling,
+      g = w.graphs[s.graph];
+    rb.append(factList({
+      'Target metric': g.metric,
+      'Causal depth': Object.keys(s.conditions).length,
+      'Correct outcome': reveal ? g.outcomes[s.outcomes[q.correct_option]] :
+        'Hidden until revealed'
+    }), provenance(q));
+    rb.append(button('Inspect this path →', () => {
+      graphIndex = s.graph;
+      stage = 1;
+      draw()
+    }), raw('Exported example', Object.fromEntries(['question', 'options', 'correct_option',
+      'verification'
+    ].map(k => [k, q[k]]))));
+    workspace.append(left, right);
+    main.append(workspace);
+    return
+  }
+  let t = el('div', 'toolbar');
+  t.append(badge(q.key));
+  if (rejected) t.append(badge(q.reviewed ? (q.model_passed ? (data.complete ? 'Not retained' :
+      'Awaiting checkpoint / not retained') : 'Verification failed') :
+    'Awaiting verification', q.model_passed === false ? false : undefined));
+  if (stage === 2) {
+    for (let [v, label] of [
+        ['sampling', '1 · Sample'],
+        ['decorations', '2 · Add names'],
+        ['question', '3 · Write']
+      ]) t.append(button(label, () => {
+      questionStep = v;
+      draw()
+    }, questionStep === v));
+    main.append(t);
+    let workspace = el('div', 'workspace');
+    main.append(workspace);
+    if (questionStep === 'sampling') {
+      let [left, lb] = panel('Python samples the scenario'), [right, rb] = panel(
+        'Four outcome slots');
+      if (q.sampling) {
+        lb.append(provenance(q));
+        let s = q.sampling,
+          g = w.graphs[s.graph];
+        rb.append(el('p', 'notice',
+          'Python evaluates the active path, chooses three other possible outcomes, then shuffles all four. These outcomes are never sent to the question writer.'
+          ), factList(Object.fromEntries(s.outcomes.map((o, i) => [String.fromCharCode(65 +
+          i) + (i === q.correct_option ? ' · correct' : ''), g.outcomes[o]
+        ]))), button('Inspect causal path →', () => {
+          graphIndex = s.graph;
+          stage = 1;
+          draw()
+        }))
+      } else {
+        lb.append(el('p', 'notice',
+          'Sampling metadata is retained in the checkpoint only for accepted examples. The writer input and verification call still show the facts for this candidate.'
+          ));
+        rb.append(el('p', 'muted', 'Choose “Write” to inspect its prompt.'))
+      }
+      workspace.append(left, right)
+    } else await showCall(q.key + '-' + questionStep, workspace, ticket);
+    return
+  }
+  t.append(button('Answers', () => {
+    answerStep = 'answers';
+    draw()
+  }, answerStep === 'answers'), button('Combined verification', () => {
+    answerStep = 'check';
+    draw()
+  }, answerStep === 'check'));
+  if (answerStep === 'answers') {
+    t.append(el('span', 'spacer'));
+    ['A', 'B', 'C', 'D'].forEach((letter, i) => t.append(button(letter, () => {
+      answerIndex = i;
+      draw()
+    }, i === answerIndex)))
+  }
+  main.append(t);
+  let workspace = el('div', 'workspace');
+  main.append(workspace);
+  if (answerStep === 'answers') {
+    await showCall(q.key + '-answer-' + answerIndex, workspace, ticket)
+  } else {
+    let c = await call(q.key + '-check');
+    if (ticket !== revision) return;
+    if (!c) {
+      workspace.append(el('div', 'empty', 'Verification has not completed yet.'));
+      return
+    }
+    let [left, lb] = panel('What the verifier saw', badge('One call · reasoning ' +
+      (c.request.chat_template_kwargs?.enable_thinking ? 'on' : 'off'))), [right, rb] = panel(
+      'Verdicts');
+    lb.append(el('p', 'instructions', c.instructions), el('h3', '', 'Question'), el('p',
+      'compact-question', c.inputs.question), factList(Object.fromEntries(c.inputs.answers
+      .map((a, i) => [String.fromCharCode(65 + i), a.answer + ' ← ' + a.outcome]))), raw(
+      'Exact verifier input', c.inputs), raw('Exact request', c.request));
+    showReview(c.result, rb, c.inputs.question, c.inputs.specification.details);
+    if (q.verification) rb.append(el('p', 'notice', q.verification.errors.length ? q.verification
+      .errors.join('; ') :
+      'Python checks passed: graph consistency, distractor invariance, evidence quotes, lengths and distinct options.'
+      ));
+    else rb.append(el('p', 'notice',
+      'A model pass alone does not guarantee retention: Python also checks formatting, exact evidence quotes and duplicate questions.'
+      ));
+    rb.append(raw('Exact structured output', c.result));
+    workspace.append(left, right)
+  }
+}
+
+function graphSvg(world, g, conditions) {
+  const NS = 'http://www.w3.org/2000/svg',
+    svg = document.createElementNS(NS, 'svg'),
+    vars = Object.fromEntries(world.inputs.map(v => [v.id, v]));
+  const heights = g.branches.map(branch => 'outcome' in branch ? 60 :
+    g.nodes[branch.node].table.length * 36 + 20);
+  const height = heights.reduce((a, b) => a + b, 80), rootY = (height + 40) / 2;
+  svg.setAttribute('viewBox', `0 0 1180 ${height}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', g.metric + ' conditional causal graph');
+  let title = document.createElementNS(NS, 'title');
+  title.textContent = g.metric;
+  svg.append(title);
+
+  function node(tag, attrs, text) {
+    let n = document.createElementNS(NS, tag);
+    for (let [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (text !== undefined) n.textContent = text;
+    svg.append(n);
+    return n
+  }
+
+  function text(x, y, value, max = 28, color = '#20302e', size = 16) {
+    let words = value.split(' '),
+      lines = [''];
+    for (let word of words) {
+      let last = lines.length - 1;
+      if ((lines[last] + ' ' + word).trim().length > max && lines[last]) lines.push(word);
+      else lines[last] = (lines[last] + ' ' + word).trim()
+    }
+    let t = node('text', {
+      x,
+      y: y - (lines.length - 1) * size / 2,
+      'text-anchor': 'middle',
+      fill: color,
+      stroke: 'white',
+      'stroke-width': 3,
+      'paint-order': 'stroke',
+      'font-size': size,
+      'font-family': 'system-ui,sans-serif'
+    });
+    lines.forEach((s, i) => {
+      let p = document.createElementNS(NS, 'tspan');
+      p.setAttribute('x', x);
+      p.setAttribute('dy', i ? size + 2 : 0);
+      p.textContent = s;
+      t.append(p)
+    });
+    return t
+  }
+
+  function box(x, y, width, height, label, selected) {
+    node('rect', {
+      x,
+      y: y - height / 2,
+      width,
+      height,
+      rx: 9,
+      fill: selected ? '#e9f3eb' : '#f7f8f4',
+      stroke: selected ? '#176b56' : '#dce3dc',
+      'stroke-width': selected ? 2 : 1
+    });
+    text(x + width / 2, y + 5, label, width / 8, selected ? '#176b56' : '#20302e')
+  }
+
+  function link(x1, y1, x2, y2, selected) {
+    node('path', {
+      d: `M ${x1} ${y1} H ${x1+20} V ${y2} H ${x2}`,
+      fill: 'none',
+      stroke: selected ? '#176b56' : '#bcc9c1',
+      'stroke-width': selected ? 3 : 1.5
+    })
+  }
+  text(115, 30, 'First criterion', 30, '#657670', 12);
+  text(520, 30, 'Second criterion, if needed', 38, '#657670', 12);
+  text(995, 30, 'Output', 30, '#657670', 12);
+  let cursor = 60;
+  g.branches.forEach((branch, i) => {
+    let y = cursor + heights[i] / 2,
+      active = conditions && conditions[g.root] === i;
+    cursor += heights[i];
+    if ('outcome' in branch) {
+      link(220, rootY, 855, y, active);
+      text(425, y - 9, vars[g.root].values[i], 38, active ? '#176b56' : '#657670');
+      box(855, y, 280, 40, g.outcomes[branch.outcome], active)
+    } else {
+      let mid = g.nodes[branch.node];
+      link(220, rootY, 420, y, active);
+      text(322, y - 9, vars[g.root].values[i], 22, active ? '#176b56' : '#657670', 14);
+      mid.table.forEach((outcome, j) => {
+        let yy = y + (j - (mid.table.length - 1) / 2) * 36,
+          on = active && conditions[mid.input] === j;
+        link(635, y, 855, yy, on);
+        text(744, yy - 7, vars[mid.input].values[j], 28, on ? '#176b56' : '#657670', 14);
+        box(855, yy, 280, 31, g.outcomes[outcome], on)
+      });
+      box(420, y, 215, 54, vars[mid.input].name, active)
+    }
+  });
+  box(15, rootY, 205, 70, vars[g.root].name, !!conditions);
+  // Keep the active route visible where branches share a trunk.
+  svg.querySelectorAll('path[stroke="#176b56"]').forEach(path => svg.append(path.cloneNode(true)));
+  return svg
+}
+async function load() {
+  try {
+    let r = await fetch('/api/run');
+    if (!r.ok) throw Error('Could not read the run directory.');
+    data = await r.json();
+    cache.clear();
+    $('#run-name').textContent = data.name;
+    $('#status').textContent = data.complete ? 'Complete' :
+      data.status?.state === 'stopped' ? 'Stopped' : 'In progress';
+    $('#counts').textContent =
+      `${data.systems.reduce((n,r)=>n+r.train.length,0)} train · ${data.systems.reduce((n,r)=>n+r.test.length,0)} test`;
+    $('#model').textContent =
+      `${data.config.model||'MiMo'} · seed ${data.config.seed??'—'} · ${data.candidates.length} candidates`;
+    await draw()
+  } catch (error) {
+    $('#error').textContent = error.message
+  }
+}
+$('#refresh').onclick = load;
+window.addEventListener('unhandledrejection', e => {
+  $('#error').textContent = e.reason?.message || String(e.reason)
+});
+load();
+</script>
+</html>

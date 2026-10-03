@@ -1,597 +1,300 @@
 import asyncio
-import copy
+from copy import deepcopy
 import json
-import itertools
-import re
-from collections import Counter
+import random
+
 import httpx
 import pytest
+
 import systems_bench as b
 
 
-def ok(schema):
-    return {k: True if v == b.BOOL else "OK" for k, v in schema["properties"].items()}
+@pytest.fixture
+def blueprint():
+    return dict(inputs=[dict(name=f"condition {i}", values=[f"state {j}" for j in range(3 + i % 2)]) for i in range(6)],
+                metrics=[dict(name=f"metric {i}", outcomes=[f"outcome {i}-{j}" for j in range(4 + i % 3)]) for i in range(8)])
+
+
+def test_random_mappings_ignore_label_meanings(blueprint):
+    world = b.build_world(blueprint, 1, "An otter by a river")
+    assert world == b.build_world(blueprint, 1, "An otter by a river")
+    renamed = deepcopy(blueprint)
+    for metric in renamed["metrics"]:
+        metric["outcomes"] = ["renamed " + s for s in metric["outcomes"]]
+    routes = lambda w: [(g["root"], g["branches"], g["nodes"]) for g in w["graphs"]]
+    assert routes(world) == routes(b.build_world(renamed, 1, "An otter by a river"))
+    assert routes(world) != routes(b.build_world(blueprint, 2, "An otter by a river"))
+
+
+@pytest.mark.parametrize("input_count", [5, 6])
+def test_conditional_graphs_cover_all_outcomes_and_both_depths(blueprint, input_count):
+    blueprint["inputs"] = blueprint["inputs"][:input_count]
+    shapes = set()
+    for seed in range(60):
+        world = b.build_world(blueprint, seed, "An otter by a river")
+        for graph in world["graphs"]:
+            direct, mediated = set(), set()
+            shapes.add((len(graph["branches"]), len(graph["nodes"])))
+            for case in b.assignments(graph):
+                required = b.required_inputs(graph, case)
+                minimal = {k: case[k] for k in required}
+                gold = b.evaluate(graph, case)
+                assert b.evaluate(graph, minimal) == gold
+                (direct if len(required) == 1 else mediated).add(gold)
+                if len(required) == 1:
+                    second = next(k for k in graph["inputs"] if k not in minimal)
+                    assert all(b.evaluate(graph, minimal | {second:v}) == gold for v in range(graph["inputs"][second]))
+                else:
+                    assert len({b.evaluate(graph, minimal | {required[1]:v}) for v in range(graph["inputs"][required[1]])}) > 1
+            assert direct and mediated and not direct & mediated
+            assert direct | mediated == set(range(len(graph["outcomes"])))
+    assert len(shapes) >= 3
+
+
+def test_second_criterion_is_only_read_on_its_branch():
+    graph = dict(root="a", branches=[dict(outcome=0),dict(node=0),dict(node=1)],
+                 nodes=[dict(input="b",table=[1,2,3]),dict(input="b",table=[3,1,2])])
+    assert b.evaluate(graph,{"a":0}) == 0
+    assert b.required_inputs(graph,{"a":0}) == ["a"]
+    assert [b.evaluate(graph,{"a":1,"b":i}) for i in range(3)] == [1,2,3]
+    assert [b.evaluate(graph,{"a":2,"b":i}) for i in range(3)] == [3,1,2]
+    with pytest.raises(KeyError):
+        b.evaluate(graph,{"a":1})
+
+
+def test_sampling_counts_and_inactive_second_criterion(blueprint):
+    world=b.build_world(blueprint,4,"An otter by a river")
+    counts, decorations, positions, depths=set(),set(),set(),set()
+    saw_inactive_second=False
+    for seed in range(100):
+        for i,g in enumerate(world["graphs"]):
+            s=b.sample(world,i,random.Random(seed))
+            gold=b.evaluate(g,s["conditions"])
+            assert s["outcomes"][s["correct_option"]] == gold
+            assert len(set(s["outcomes"])) == 4
+            assert not set(s["conditions"]) & set(s["distractors"])
+            for k in s["distractors"]:
+                variable=next(v for v in world["inputs"] if v["id"]==k)
+                assert all(b.evaluate(g,s["conditions"]|{k:v})==gold for v in range(len(variable["values"])))
+                if k in g["inputs"]:
+                    saw_inactive_second=True
+                    assert len(s["conditions"])==1
+            counts.add(len(s["distractors"])); decorations.add(s["decoration_count"])
+            positions.add(s["correct_option"]); depths.add(len(s["conditions"]))
+    assert counts=={0,1} and decorations=={1,2} and depths=={1,2}
+    assert positions=={0,1,2,3} and saw_inactive_second
+
+
+@pytest.mark.parametrize("fault",["first_again","incomplete","unreachable","no_second_effect","bad_node"])
+def test_invalid_graphs_rejected(blueprint,fault):
+    w=b.build_world(blueprint,5,"An otter by a river");g=w["graphs"][0];n=g["nodes"][0]
+    if fault=="first_again":n["input"]=g["root"]
+    elif fault=="incomplete":n["table"].pop()
+    elif fault=="unreachable":g["nodes"].append(deepcopy(n))
+    elif fault=="no_second_effect":n["table"]=[n["table"][0]]*len(n["table"])
+    else:next(x for x in g["branches"] if "node" in x)["node"]=99
+    with pytest.raises((ValueError,b.ValidationError)):b.validate_world(w)
 
 
 class FakeModels:
-    def __init__(self, reject_first_worlds=False, collide=False):
-        self.calls = []
-        self.reject_first_worlds = reject_first_worlds
-        self.collide = collide
-
-    async def call(self, key, model, task, schema, *, thinking, **kwargs):
-        self.calls.append((key, model, task, thinking))
-        if key.endswith("/setting"):
-            n = schema["properties"]["requests"]["minItems"]
-            return {
-                "shared": "A class observes a river otter.",
-                "requests": [
-                    {
-                        "aspect": f"Situation {i}",
-                        "factors": ["water clarity", "bank cover"][: 1 + i % 2],
-                    }
-                    for i in range(n)
-                ],
-            }
-        if key.endswith("/plan"):
-            n = schema["properties"]["worlds"]["items"]["minItems"]
-            return {
-                "worlds": [
-                    [f"WORLD_{i} intent {j}" for j in range(n)]
-                    for i in range(b.WORLD_COUNT)
-                ]
-            }
-        if "/write-" in key:
-            plan = json.loads(task.split("\n", 1)[1])["plan"]
-            return {"rules": plan}
-        if "/consistent-" in key:
-            return {
-                "consistent": not (self.reject_first_worlds and "worlds-0/" in key),
-                "sufficient_complexity": True,
-                "reason": "Resolve the bank conflict.",
-            }
-        if key.endswith("/collisions"):
-            count = schema["properties"]["rule_examples"]["minItems"]
-            return {**ok(b.COLLISIONS), "rule_examples": [
-                {"distinguishable": True, "question": f"Inspection example for aspect {i}?",
-                 "answers": [f"Distinct outcome {w}" for w in range(b.WORLD_COUNT)], "reason": "OK"}
-                for i in range(count)
-            ]}
-        if "/questions-" in key:
-            n = schema["properties"]["questions"]["minItems"]
-            return {
-                "questions": [
-                    f"What does the otter do beside the clear pool? Scene {key} {i}"
-                    for i in range(n)
-                ]
-            }
-        if "/answer-" in key:
-            i = re.search(r"WORLD_(\d)", task).group(1)
-            return {"answer": f"The otter gives response {i}.", "answerable": True}
-        if "/verify-" in key:
-            i = re.search(r"WORLD_(\d)", task).group(1)
-            return {
-                c: self.collide or f"response {i}." in o
-                for c, o in re.findall(r"([ABCD])\. (.*)", task)
-            }
-        if "/possible-" in key:
-            return dict.fromkeys(b.OPTION_LABELS, True)
-        if key.endswith("/language"):
-            return ok(schema)
-        if key.endswith("/deduplication"):
-            return dict.fromkeys(b.OPTION_LABELS, True)
+    def __init__(self,blueprint):
+        self.blueprint,self.calls,self.settings=blueprint,[],{}
+        self.reject=False
+    async def call(self,key,prompt,schema,**kwargs):
+        self.calls.append((key,prompt));self.settings[key]=kwargs
+        if schema==b.BLUEPRINT:return deepcopy(self.blueprint)
+        if schema==b.CHECK:return dict(valid=not self.reject,reason="World review")
+        if schema==b.QUESTION:
+            spec=json.loads(prompt[len(b.QUESTION_PROMPT):])
+            return dict(question="Scene "+key+". "+spec["metric"]+": "+", ".join(d["value"] for d in spec["details"]))
+        if schema==b.ANSWER:return dict(answer=json.loads(prompt[len(b.ANSWER_PROMPT):])["outcome"])
+        if prompt.startswith(b.CHECK_PROMPT):
+            payload=json.loads(prompt[len(b.CHECK_PROMPT):]);spec=payload["specification"]
+            assert schema["properties"]["question"]["properties"]["evidence"]["minItems"]==len(spec["details"])
+            return dict(question=dict(evidence=[d["value"] for d in spec["details"]],valid=not self.reject,reason="Question review"),
+                        distractors=dict(valid=not self.reject,reason="Distractor review"),
+                        answers=[dict(valid=True,reason="Answer review") for _ in range(4)])
+        if prompt.startswith(b.DECORATION_PROMPT):
+            count=json.loads(prompt[len(b.DECORATION_PROMPT):])["count"]
+            return dict(details=[dict(attribute=f"name {i}",value=f"Pip{key}{i}") for i in range(count)])
         raise AssertionError(key)
 
 
-@pytest.mark.parametrize("train,test,rules", [(32, 8, 4), (256, 100, 16)])
-def test_offline_resume_export_and_reject_tampering(tmp_path, train, test, rules):
-    args = b.parse_args(
-        [
-            "--systems",
-            "1",
-            "--rules",
-            str(rules),
-            "--train",
-            str(train),
-            "--test",
-            str(test),
-            "--output-dir",
-            str(tmp_path),
-        ]
-    )
-    models = FakeModels()
-    state = asyncio.run(b.generate(args, models))
-    s = state["systems"][0]
-    assert len(s["items"]) == train + test
-    assert len(s["drafts"]) == train + test  # Passing drafts never exceed remaining quotas.
-    assert len({b.question_key(q["question"]) for q in s["items"]}) == train + test
-    resumed = FakeModels()
-    assert asyncio.run(b.generate(args, resumed)) == state
-    assert resumed.calls == []
-    b.export(state, tmp_path)
-    row = json.loads((tmp_path / "systems_bench.jsonl").read_text())
-    assert "question_world_answer" not in json.dumps(row)
-    assert "inspection only" in (tmp_path / "review.md").read_text()
-    assert set(row) == {"Setting", "World", "num_train", "num_test", "train_data", "test_data"}
-    assert row["Setting"] == s["shared"]
-    assert row["World"] == b.world_text(s["shared"], s["worlds"][s["gold"]])
-    assert (len(row["train_data"]), len(row["test_data"])) == (train, test)
-    exported = row["train_data"] + row["test_data"]
-    assert [q["question"] for q in exported] != [q["question"] for q in s["items"]]
-    assert {q["question"] for q in exported} == {q["question"] for q in s["items"]}
-    for split in ("train", "test"):
-        counts = Counter(q["correct_option"] for q in row[split + "_data"])
-        assert len({counts.get(i, 0) for i in range(b.OPTION_COUNT)}) > 1
-        for q in row[split + "_data"]:
-            assert f"response {s['gold']}." in q["options"][q["correct_option"]]
-    b.export(state, tmp_path)
-    assert json.loads((tmp_path / "systems_bench.jsonl").read_text()) == row
-    altered = copy.deepcopy(state)
-    altered["systems"][0]["items"][0]["gold_check"] = dict.fromkeys("ABCD", True)
-    with pytest.raises(ValueError, match="provenance"):
-        b.export(altered, tmp_path)
-    altered = copy.deepcopy(state)
-    item = altered["systems"][0]["items"][0]
-    item["possible_check"] = dict(item["gold_check"])
-    with pytest.raises(ValueError, match="provenance"):
-        b.export(altered, tmp_path)
-    altered = copy.deepcopy(state)
-    altered["systems"][0]["items"][0]["uniqueness"]["B"] = False
-    with pytest.raises(ValueError, match="provenance"):
-        b.export(altered, tmp_path)
-    altered = copy.deepcopy(state)
-    del altered["systems"][0]["items"][0]["uniqueness"]
-    with pytest.raises(ValueError, match="provenance"):
-        b.export(altered, tmp_path)
-    altered = copy.deepcopy(state)
-    altered["systems"][0]["consistency"][0]["consistent"] = False
-    with pytest.raises(ValueError, match="world set"):
-        b.export(altered, tmp_path)
+@pytest.mark.parametrize("decoration_count",[1,2])
+def test_isolated_writers_and_shared_answer_variation(blueprint,decoration_count):
+    w=b.build_world(blueprint,8,"An otter by a river")
+    s=next(s for seed in range(100) if (s:=b.sample(w,0,random.Random(seed)))["decoration_count"]==decoration_count)
+    m=FakeModels(blueprint);item=asyncio.run(b.render(m,"q",w,s))
+    assert item["verification"]["passed"]
+    qp=json.loads(next(p for k,p in m.calls if k=="q-question")[len(b.QUESTION_PROMPT):])
+    assert set(qp)=={"setting","metric","details","variation"}
+    assert qp["details"]==item["sampling"]["details"]
+    answers=[json.loads(p[len(b.ANSWER_PROMPT):]) for k,p in m.calls if "-answer-" in k]
+    assert len(answers)==4 and len({a["variation"] for a in answers})==1
+    assert all(set(a)=={"system","metric","outcome","variation"} and a["system"]==w["setting"] for a in answers)
+    assert m.settings["q-question"]=={"thinking":True}
+    assert all(m.settings[f"q-answer-{i}"]=={} for i in range(4))
+    assert [k for k,_ in m.calls]==["q-decorations","q-question",*[f"q-answer-{i}" for i in range(4)],"q-check"]
+    check=json.loads(next(p for k,p in m.calls if k=="q-check")[len(b.CHECK_PROMPT):])
+    assert set(check["distractor_plan"])=={"environmental","acausal"}
+    assert len(check["distractor_plan"]["environmental"])==len(s["distractors"])
+    assert len(check["distractor_plan"]["acausal"])==decoration_count
+    assert "correct_option" not in check
+    assert not m.settings["q-check"].get("thinking", False)
+    assert [d["inactive_second_criterion"] for d in check["distractor_plan"]["environmental"]] == [k in w["graphs"][0]["inputs"] for k in s["distractors"]]
+    other=FakeModels(blueprint)
+    with pytest.raises(ValueError,match="disagrees"):
+        asyncio.run(b.render(other,"q",w,dict(s,correct_option=(s["correct_option"]+1)%4)))
+    assert other.calls == m.calls
+    assert all("correct_option" not in p for _,p in m.calls)
 
 
-@pytest.mark.parametrize("thinking", [False, True])
-def test_cached_requests_preserve_thinking_toggle_and_validate_json(tmp_path, monkeypatch, thinking):
-    monkeypatch.setitem(b.THINKING, "answers", thinking)
+@pytest.mark.parametrize("fault",["question","distractors","answer","evidence","length"])
+def test_automatic_filtering_preserves_quotas_and_resume(blueprint,tmp_path,fault):
+    class Failure(FakeModels):
+        async def call(self,key,prompt,schema,**kwargs):
+            result=await super().call(key,prompt,schema,**kwargs)
+            if fault=="length" and key=="0-train-0-question":result["question"]="word "*(b.QUESTION_WORDS+1)
+            if key=="0-train-0-check":
+                if fault=="evidence":result["question"]["evidence"][0]="Not in the question"
+                elif fault in ("question","distractors"):result[fault]["valid"]=False
+                elif fault=="answer":result["answers"][2]["valid"]=False
+            return result
+    args=b.parse_args(["--output-dir",str(tmp_path)])
+    m=Failure(blueprint);state=asyncio.run(b.generate(args,m));row=state["systems"][0]
+    assert row["attempts"]==dict(train=17,test=8)
+    assert all(q["verification"]["passed"] for q in row["train"])
+    assert len([k for k,_ in m.calls if k.endswith("-question")])==25
+    calls=len(m.calls);assert asyncio.run(b.generate(args,m))==state and len(m.calls)==calls
+    exported=b.export(state,tmp_path)[0]
+    assert len(exported["train_data"])==16 and len(exported["test_data"])==8
+    assert all(q["verification"]["passed"] for q in exported["train_data"])
+    for split,n in [("train",2),("test",1)]:
+        assert [sum(q["sampling"]["graph"]==g for q in row[split]) for g in range(8)]==[n]*8
+
+
+@pytest.mark.parametrize("revise",[False,True])
+def test_world_is_checked_and_revised_as_one_batch(blueprint,revise):
+    m=FakeModels(blueprint);m.reject=revise
+    world=asyncio.run(b.prepare_world(m,"w",dict(name="Otter by river"),42))
+    b.validate_world(world)
+    assert [k for k,_ in m.calls]==["w-world","w-world-check"]+(["w-world-revise"] if revise else [])
+    check=json.loads(m.calls[1][1][len(b.WORLD_CHECK_PROMPT):])
+    assert check==dict(setting="Otter by river",blueprint=blueprint)
+    if revise:
+        revision=json.loads(m.calls[2][1][len(b.WORLD_REVISE_PROMPT):])
+        assert revision["blueprint"]==blueprint and revision["feedback"]=="World review"
+
+
+def test_export_checks_gold_and_distractor_invariance(blueprint,tmp_path):
+    args=b.parse_args(["--output-dir",str(tmp_path)]);state=asyncio.run(b.generate(args,FakeModels(blueprint)))
+    bad=deepcopy(state);q=bad["systems"][0]["train"][0]
+    q["correct_option"]=q["sampling"]["correct_option"]=(q["correct_option"]+1)%4
+    with pytest.raises(ValueError,match="disagrees"):b.export(bad,tmp_path)
+    bad=deepcopy(state);q=bad["systems"][0]["train"][0]
+    k=next(iter(q["sampling"]["conditions"]));q["sampling"]["distractors"]={k:0}
+    with pytest.raises(ValueError,match="affects"):b.export(bad,tmp_path)
+
+
+def test_question_and_answer_writers_overlap(blueprint):
+    async def run():
+        answers_done = asyncio.Event()
+        class Overlap(FakeModels):
+            async def call(self, key, *args, **kwargs):
+                if key == "q-question":
+                    await answers_done.wait()
+                result = await super().call(key, *args, **kwargs)
+                if key == "q-answer-3":
+                    answers_done.set()
+                return result
+        world = b.build_world(blueprint, 8, "An otter by a river")
+        models = Overlap(blueprint)
+        item = await asyncio.wait_for(b.render(models, "q", world, b.sample(world, 0, random.Random(1))), 2)
+        assert item["verification"]["passed"]
+        assert [k for k, _ in models.calls if "-answer-" in k] == [f"q-answer-{i}" for i in range(4)]
+    asyncio.run(run())
+
+
+def test_continuous_refill_checkpoint_and_resume(blueprint, tmp_path):
+    async def run():
+        blocked = asyncio.Event()
+        class Slow(FakeModels):
+            async def call(self, key, *args, **kwargs):
+                if key == "0-train-0-check":
+                    await blocked.wait()
+                result = await super().call(key, *args, **kwargs)
+                if key == "0-train-1-check":
+                    result["question"]["valid"] = False
+                return result
+        args = b.parse_args(["--output-dir", str(tmp_path), "--concurrency", "24"])
+        models = Slow(blueprint)
+        task = asyncio.create_task(b.generate(args, models))
+        try:
+            async def wait_for_progress():
+                while True:
+                    await asyncio.sleep(0)
+                    path = tmp_path / "checkpoint.json"
+                    if path.exists():
+                        row = json.loads(path.read_text())["systems"][0]
+                        if len(row["train"]) == 15 and len(row["test"]) == 8:
+                            return row
+            before = await asyncio.wait_for(wait_for_progress(), 2)
+            assert before["attempts"] == dict(train=17, test=8)
+            assert list(before["pending"]) == ["0-train-0"]
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        # Completed examples survive; only the outstanding reservation resumes.
+        resumed = FakeModels(blueprint)
+        row = (await b.generate(args, resumed))["systems"][0]
+        assert len(row["train"]) == 16 and len(row["test"]) == 8
+        assert row["train"][:15] == before["train"] and row["test"] == before["test"]
+        assert row["attempts"] == before["attempts"] and not row["pending"]
+        assert all(k.startswith("0-train-0-") for k, _ in resumed.calls)
+        original = dict(models.calls)
+        assert all(original[k] == p for k, p in resumed.calls if k in original)
+        assert [sum(q["sampling"]["graph"] == g for q in row["train"]) for g in range(8)] == [2]*8
+    asyncio.run(run())
+
+
+def test_api_payload_cache_and_permanent_errors(tmp_path):
     requests = []
-
     def respond(request):
         requests.append(json.loads(request.content))
-        return httpx.Response(
-            200,
-            json={
-                "choices": [
-                    {
-                        "finish_reason": "stop",
-                        "message": {
-                            "content": json.dumps(
-                                {"answer": "It swims.", "answerable": True}
-                            )
-                        },
-                    }
-                ]
-            },
-        )
-
+        return httpx.Response(200, json=dict(choices=[dict(finish_reason="stop", message=dict(content='{"answer":"A"}'))]))
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-            models = b.Models(client, tmp_path)
-            first = await b.answer(models, "a", "WORLD", "QUESTION", "STYLE")
-            assert await b.answer(models, "a", "WORLD", "QUESTION", "STYLE") == first
-            with pytest.raises(ValueError, match="Changed request"):
-                await b.answer(models, "a", "CHANGED", "QUESTION", "STYLE")
-
-    asyncio.run(run())
-    assert len(requests) == 1
-    assert requests[0]["chat_template_kwargs"] == {"enable_thinking": thinking}
-    assert "provider" not in requests[0]
-    assert "reasoning" not in requests[0]
-    assert requests[0]["max_tokens"] == (b.MAX_OUTPUT_TOKENS if thinking else b.NO_THINKING_OUTPUT_TOKENS)
-    assert requests[0]["model"] == b.MODEL
-    assert requests[0]["response_format"] == {
-        "type": "json_schema",
-        "json_schema": {"name": "benchmark_response", "strict": True, "schema": b.ANSWER},
-    }
-    assert requests[0]["temperature"] == 1.0
-    assert (
-        json.loads(requests[0]["messages"][0]["content"].split("Response schema:\n")[1])
-        == b.ANSWER
-    )
-
-
-def test_stable_world_prefix_and_no_arithmetic():
-    models = FakeModels()
-    asyncio.run(
-        b.answer(
-            models, "x/answer-0", "WORLD_0 " * 200, "first question", "first style"
-        )
-    )
-    asyncio.run(
-        b.answer(
-            models, "y/answer-0", "WORLD_0 " * 200, "second question", "second style"
-        )
-    )
-    p, q = [call[2] for call in models.calls]
-    assert p.split("\nStyle:")[0] == q.split("\nStyle:")[0]
-    assert "without arithmetic" in b.SYSTEM_PROMPT
-    models.calls.clear()
-    asyncio.run(b.language_check(models, "x/language", "One plus one."))
-    assert "Reject every calculation" in models.calls[0][2]
-    assert models.calls[0][3] is False
-
-
-def test_model_calls_are_parallel_but_bounded(tmp_path):
-    async def run():
-        active = peak = 0
-
-        async def respond(request):
-            nonlocal active, peak
-            active += 1
-            peak = max(peak, active)
-            await asyncio.sleep(0.01)
-            active -= 1
-            return httpx.Response(
-                200,
-                json={
-                    "choices": [
-                        {
-                            "finish_reason": "stop",
-                            "message": {
-                                "content": '{"answer":"It swims.","answerable":true}'
-                            },
-                        }
-                    ]
-                },
-            )
-
-        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-            models = b.Models(client, tmp_path, concurrency=2)
-            await b.settled(
-                *(
-                    b.answer(models, str(i), "WORLD", "QUESTION", "STYLE")
-                    for i in range(6)
-                )
-            )
-        assert peak == 2
-
-    asyncio.run(run())
-
-
-def test_question_batches_exclude_full_rules_and_cap_each_remaining_quota():
-    system = {"quota": [45, 45, 44, 44], "items": [
-        {"target": rule} for rule, count in enumerate([45, 44, 41, 0])
-        for _ in range(count)
-    ]}
-    targets = b.question_targets(system, 16)
-    assert len(targets) == 16
-    assert Counter(i for batch in targets for i in batch) == {1: 1, 2: 3, 3: 16}
-    assert targets[0] == [1, 2, 3]
-    assert targets[3:] == [[3]] * 13
-    system["items"] = [{"target": i} for i, quota in enumerate(system["quota"]) for _ in range(quota)]
-    assert b.question_targets(system, 16) == []
-    system["items"].pop()
-    assert b.question_targets(system, 16) == [[3]]
-
-
-@pytest.mark.parametrize("initial_bad", [3, 16])
-def test_retirement_cap_is_cumulative_and_preserves_questions_and_total_quota(initial_bad):
-    assert b.parse_args([]).rules == 16
-    system = {
-        "rule_results": [
-            {"generated": 230 if i < initial_bad else 20, "checked": 20, "passed": 4 if i < initial_bad else 12, "rejected_rounds": [0, 1, 2]}
-            for i in range(16)
-        ],
-        "retired": [], "substitutions": [], "round": 3,
-        "quota": [23 if i < 4 else 22 for i in range(16)],
-        "items": [{"target": i} for i in range(16) for _ in range(4 if i < initial_bad else 12)],
-    }
-    items = copy.deepcopy(system["items"])
-    b.retire_rules(system)
-    assert len(system["retired"]) == min(initial_bad, 4)
-    for stats in system["rule_results"]:
-        stats["generated"] = 10000  # Remaining rules now also exceed their candidate budgets.
-    system["round"] = 4
-    b.retire_rules(system)
-    assert len(system["retired"]) == 4
-    assert sum(system["quota"]) == 356
-    assert system["items"] == items
-    counts = Counter(item["target"] for item in items)
-    assert all(system["quota"][i] == counts[i] for i in system["retired"])
-    saved = copy.deepcopy(system)
-    b.retire_rules(system)
-    assert system == saved
-
-
-@pytest.mark.parametrize("non_unique", list(b.OPTION_LABELS))
-def test_non_unique_answer_rejects_question_even_when_other_checks_pass(non_unique):
-    class DuplicateModels(FakeModels):
-        async def call(self, key, model, task, schema, **kwargs):
-            result = await super().call(key, model, task, schema, **kwargs)
-            if key.endswith("/deduplication"):
-                result[non_unique] = False
-            return result
-
-    models = DuplicateModels()
-    system = {"shared": "A river otter.", "worlds": [[f"WORLD_{i}"] for i in range(5)], "gold": 0, "question_world": 4}
-    item, reason = asyncio.run(b.evaluate_question(models, "q", system, {"question": "What does the otter do?", "target": 0}, 42))
-    assert item is None
-    assert reason == "duplicate_answers"
-    call = next(c for c in models.calls if c[0].endswith("/deduplication"))
-    assert call[3] is False
-    assert "What does the otter do?" in call[2]
-    assert len(re.findall(r"^[ABCD]\. ", call[2], re.MULTILINE)) == 4
-    assert "WORLD_" not in call[2]  # No privileged world or correct-answer context.
-
-
-def test_schema_echo_is_rejected_even_when_transport_returns_http_200(tmp_path, monkeypatch):
-    monkeypatch.setattr(b, "REQUEST_ATTEMPTS", 1)
-    async def run():
-        def respond(request):
-            payload = json.loads(request.content)
-            assert payload["response_format"]["json_schema"]["schema"] == b.ANSWER
-            return httpx.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(b.ANSWER)}}]})
-        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-            with pytest.raises(b.SettingExhausted):
-                await b.answer(b.Models(client, tmp_path), "answer", "WORLD", "QUESTION", "STYLE")
-        assert not (tmp_path / "answer.json").exists()
-    asyncio.run(run())
-
-
-def test_invalid_server_schema_request_fails_without_eight_retries(tmp_path):
-    requests = []
-    async def run():
-        def respond(request):
-            requests.append(request)
-            return httpx.Response(400, json={"error": "unsupported schema"})
-        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+            models = b.Models(client, tmp_path, 1)
+            assert await models.call("a", "Say A", b.ANSWER) == dict(answer="A")
+            assert await models.call("a", "Say A", b.ANSWER) == dict(answer="A")
+            assert await models.call("thinking", "Say A", b.ANSWER, thinking=True) == dict(answer="A")
+            with pytest.raises(ValueError, match="changed"):
+                await models.call("a", "Say B", b.ANSWER)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(401))) as client:
             with pytest.raises(httpx.HTTPStatusError):
-                await b.answer(b.Models(client, tmp_path), "answer", "WORLD", "QUESTION", "STYLE")
+                await b.Models(client, tmp_path, 1).call("b", "Say B", b.ANSWER)
     asyncio.run(run())
-    assert len(requests) == 1
+    assert len(requests) == 2
+    for request in requests:
+        assert request["max_tokens"] == 131072
+        assert not set(request) & {"temperature", "top_p", "top_k", "min_p", "seed"}
+    assert requests[0]["messages"][-1] == dict(role="user", content="Say A")
 
 
-def test_setting_schema_preserves_both_factor_counts_without_contains():
-    from jsonschema import Draft202012Validator
-    schema = b.request_schema(8)
-    assert '"contains"' not in json.dumps(schema)
-    validator = Draft202012Validator(schema)
-    for counts in itertools.product((1, 2), repeat=8):
-        value = [{"aspect": f"response {i}", "factors": ["wind", "cloud"][:n]} for i, n in enumerate(counts)]
-        assert validator.is_valid(value) == (len(set(counts)) == 2)
-    valid = [{"aspect": "response", "factors": ["wind", "cloud"][:1 + i % 2]} for i in range(8)]
-    assert not validator.is_valid(valid[:-1])
-    assert not validator.is_valid(valid + valid[:1])
 
 
-def test_parallel_rows_resume_and_global_question_uniqueness(tmp_path, monkeypatch):
-    args = b.parse_args(['--systems', '3', '--rules', '4', '--train', '32',
-                         '--test', '8', '--row-concurrency', '2',
-                         '--output-dir', str(tmp_path)])
-    original = b.prepare_system
-    active = peak = 0
-
-    async def prepare(*a, **kw):
-        nonlocal active, peak
-        active += 1
-        peak = max(peak, active)
-        await asyncio.sleep(0)
-        try:
-            return await original(*a, **kw)
-        finally:
-            active -= 1
-
-    monkeypatch.setattr(b, 'prepare_system', prepare)
-    class RepeatingModels(FakeModels):
-        async def call(self, key, *a, **kw):
-            result = await super().call(key, *a, **kw)
-            if '/round-0000/questions-0' in key:
-                result['questions'][0] = 'What does the otter do beside the clear pool?'
-            return result
-
-    state = asyncio.run(b.generate(args, RepeatingModels()))
-    assert peak == 2
-    assert len(state['systems']) == 3
-    assert all(len(s['items']) == 40 for s in state['systems'])
-    questions = [b.question_key(i['question']) for s in state['systems'] for i in s['items']]
-    assert len(questions) == len(set(questions)) == 120
-    resumed = FakeModels()
-    assert asyncio.run(b.generate(args, resumed)) == state
-    assert not resumed.calls
-    b.export(state, tmp_path)
-    assert len((tmp_path / 'systems_bench.jsonl').read_text().splitlines()) == 3
-
-
-def test_parallel_failure_cancels_other_rows_and_resumes(tmp_path, monkeypatch):
-    args = b.parse_args(['--systems', '3', '--rules', '4', '--train', '32',
-                         '--test', '8', '--row-concurrency', '2',
-                         '--output-dir', str(tmp_path)])
-    original = b.prepare_system
-    cancelled = []
-
-    async def scenario():
-        entered = asyncio.Event()
-
-        async def prepare(models, key, *a):
-            if key == 'system-001':
-                entered.set()
-                try:
-                    await asyncio.Event().wait()
-                finally:
-                    cancelled.append(key)
-            await entered.wait()
-            return await original(models, key, *a)
-
-        class FailingModels(FakeModels):
-            async def call(self, key, *a, **kw):
-                if '/questions-' in key:
-                    raise RuntimeError('injected failure')
-                return await super().call(key, *a, **kw)
-
-        monkeypatch.setattr(b, 'prepare_system', prepare)
-        with pytest.raises(ExceptionGroup, match='TaskGroup'):
-            await b.generate(args, FailingModels())
-
-    asyncio.run(scenario())
-    assert cancelled == ['system-001']
-    saved = json.loads((tmp_path / 'checkpoint.json').read_text())
-    assert saved['systems'][0] is not None
-    assert saved['systems'][1:] == [None, None]
-    monkeypatch.setattr(b, 'prepare_system', original)
-    state = asyncio.run(b.generate(args, FakeModels()))
-    assert all(len(s['items']) == 40 for s in state['systems'])
-
-
-@pytest.mark.parametrize('failure', ['world', 'question', 'request'])
-def test_exhausted_setting_is_replaced_once_and_resume_keeps_assignment(tmp_path, monkeypatch, failure):
-    args = b.parse_args(['--systems', '2', '--rules', '4', '--train', '32', '--test', '8',
-                         '--row-concurrency', '2', '--output-dir', str(tmp_path)])
-    original_prepare, original_evaluate = b.prepare_system, b.evaluate_question
-
-    async def prepare(models, key, *a):
-        if key == 'system-000' and failure in ('world', 'request'):
-            raise b.SettingExhausted(f'{failure} limit exhausted')
-        return await original_prepare(models, key, *a)
-
-    async def evaluate(models, key, *a):
-        if key.startswith('system-000/round-') and failure == 'question':
-            return None, 'duplicate_answers'
-        return await original_evaluate(models, key, *a)
-
-    monkeypatch.setattr(b, 'prepare_system', prepare)
-    monkeypatch.setattr(b, 'evaluate_question', evaluate)
-    state = asyncio.run(b.generate(args, FakeModels()))
-    assert state['assignments'] == [2, 1]
-    assert state['next_setting'] == 3
-    assert len(state['discarded']) == 1
-    assert state['discarded'][0]['catalogue_index'] == 0
-    assert all(len(s['items']) == 40 for s in state['systems'])
-    if failure == 'question':
-        assert sum(r['generated'] for r in state['discarded'][0]['system']['rule_results']) == 20 * 40
-    resumed = FakeModels()
-    assert asyncio.run(b.generate(args, resumed)) == state
-    assert not resumed.calls
-    b.export(state, tmp_path)
-
-
-def test_catalogue_exhaustion_preserves_discarded_rows(tmp_path, monkeypatch):
-    args = b.parse_args(['--systems', '2', '--rules', '4', '--train', '32', '--test', '8',
-                         '--row-concurrency', '2', '--output-dir', str(tmp_path)])
-    ideas = b.catalogue()[:4]
-    monkeypatch.setattr(b, 'catalogue', lambda: ideas)
-    attempted = []
-
-    async def fail(models, key, idea, *a):
-        attempted.append(idea['name'])
-        await asyncio.sleep(0)
-        raise b.SettingExhausted('world limit')
-
-    monkeypatch.setattr(b, 'prepare_system', fail)
-    with pytest.raises(ExceptionGroup) as error:
-        asyncio.run(b.generate(args, FakeModels()))
-    assert any(isinstance(e, b.CatalogueExhausted) for e in error.value.exceptions)
-    state = json.loads((tmp_path / 'checkpoint.json').read_text())
-    assert len(attempted) == len(set(attempted)) == 4
-    assert len(state['discarded']) == 4
-    assert state['next_setting'] == 4
-
-
-@pytest.mark.parametrize('generated,accepted,quota,retired', [
-    (29, 2, 3, False), (30, 2, 3, True), (31, 3, 3, False), (30, 2, 4, False),
-])
-def test_retirement_uses_generated_count_and_current_unfilled_quota(generated, accepted, quota, retired):
-    system = {
-        'rule_results': [
-            {'generated': generated, 'checked': accepted, 'passed': accepted, 'rejected_rounds': []},
-            {'generated': 1, 'checked': 1, 'passed': 1, 'rejected_rounds': []},
-        ],
-        'quota': [quota, 3], 'items': [{'target': 0}] * accepted + [{'target': 1}],
-        'retired': [], 'substitutions': [], 'round': 1,
-    }
-    b.retire_rules(system)
-    assert (0 in system['retired']) == retired
-
-
-def test_question_targets_never_exceed_remaining_row_budget():
-    system = {'quota': [23, 23, 22, 22], 'items': []}
-    assert b.question_targets(system, 16, 6) == [[0, 1, 2, 3], [0, 1]]
-    assert b.question_targets(system, 16, 0) == []
-
-
-def test_duplicate_generated_questions_consume_row_budget(tmp_path, monkeypatch):
-    args = b.parse_args(['--systems', '1', '--rules', '4', '--train', '32', '--test', '8',
-                         '--output-dir', str(tmp_path)])
-    original = b.question_batch
-
-    async def questions(models, key, system, targets, seed):
-        if '/setting-' not in key:
-            return [{'question': 'What does the otter do beside the clear pool?', 'target': i}
-                    for i in targets]
-        return await original(models, key, system, targets, seed)
-
-    monkeypatch.setattr(b, 'question_batch', questions)
-    state = asyncio.run(b.generate(args, FakeModels()))
-    discarded = state['discarded'][0]['system']
-    assert sum(r['generated'] for r in discarded['rule_results']) == 800
-    assert len(discarded['drafts']) == len(discarded['items']) == 1
-    assert len(state['systems'][0]['items']) == 40
-    assert state['assignments'] == [1]
-
-
-def test_last_budgeted_candidates_are_evaluated_before_discard(tmp_path, monkeypatch):
-    args = b.parse_args(['--systems', '1', '--rules', '4', '--train', '32', '--test', '8',
-                         '--output-dir', str(tmp_path)])
-    monkeypatch.setattr(b, 'ROW_CANDIDATE_MULTIPLIER', 1)
-    state = asyncio.run(b.generate(args, FakeModels()))
-    assert not state['discarded']
-    assert len(state['systems'][0]['items']) == 40
-    assert sum(r['generated'] for r in state['systems'][0]['rule_results']) == 40
-
-
-def test_collision_examples_gate_revision_and_are_inspection_only(tmp_path):
-    class ExampleModels(FakeModels):
-        async def call(self, key, *a, **kw):
-            result = await super().call(key, *a, **kw)
-            if key.endswith('/collisions'):
-                for i, example in enumerate(result['rule_examples']):
-                    example['question'] = f'INSPECTION_ONLY_EXAMPLE_{i}'
-                if '/worlds-0/' in key:
-                    # The per-rule result must override a mistaken global true.
-                    result['rule_examples'][0].update(
-                        distinguishable=False, question='', answers=[''] * 5,
-                        reason='Worlds one and two make the same prediction for rule one.',
-                    )
-            return result
-
-    args = b.parse_args(['--systems', '1', '--rules', '4', '--train', '32', '--test', '8',
-                         '--output-dir', str(tmp_path)])
-    models = ExampleModels()
-    state = asyncio.run(b.generate(args, models))
-    assert sum('/write-' in key for key, *_ in models.calls) == 10
-    revision = next(task for key, _, task, _ in models.calls if '/worlds-1/plan' in key)
-    assert 'rule_checks' in revision
-    assert 'Worlds one and two' in revision
-    assert 'INSPECTION_ONLY_EXAMPLE' not in revision
-    assert all('INSPECTION_ONLY_EXAMPLE' not in task for key, _, task, _ in models.calls
-               if '/questions-' in key)
-    b.export(state, tmp_path)
-    assert 'INSPECTION_ONLY_EXAMPLE' in (tmp_path / 'review.md').read_text()
-    assert 'INSPECTION_ONLY_EXAMPLE' not in (tmp_path / 'systems_bench.jsonl').read_text()
-    assert len(state['systems'][0]['drafts']) == 40
-    damaged = copy.deepcopy(state)
-    damaged['systems'][0]['collisions']['rule_examples'][0]['question'] = ''
-    with pytest.raises(ValueError, match='world set'):
-        b.export(damaged, tmp_path)
-
-
-def test_collision_evidence_requires_every_rule_and_five_distinct_answers():
-    check = {**ok(b.COLLISIONS), 'rule_examples': [
-        {'distinguishable': True, 'question': f'Question {i}?',
-         'answers': [f'Outcome {w}' for w in range(5)], 'reason': 'OK'} for i in range(16)
-    ]}
-    assert b.collisions_passed(check, 16)
-    for modification in ('missing_rule', 'false', 'empty_answer', 'duplicate_answer'):
-        bad = copy.deepcopy(check)
-        if modification == 'missing_rule':bad['rule_examples'].pop()
-        elif modification == 'false':bad['rule_examples'][0]['distinguishable'] = False
-        elif modification == 'empty_answer':bad['rule_examples'][0]['answers'][3] = ''
-        else:bad['rule_examples'][0]['answers'][3] = bad['rule_examples'][0]['answers'][0]
-        assert not b.collisions_passed(bad, 16)
+def test_retry_empty_completion_content(tmp_path, monkeypatch):
+    attempts = []
+    def respond(request):
+        attempts.append(json.loads(request.content))
+        content = None if len(attempts) == 1 else '{"answer":"The otter rests upright."}'
+        return httpx.Response(200, json=dict(choices=[dict(finish_reason="stop", message=dict(content=content))]))
+    async def no_wait(seconds):
+        pass
+    monkeypatch.setattr(b.asyncio, "sleep", no_wait)
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+            return await b.Models(client, tmp_path, 1).call("answer", "Write an answer", b.ANSWER)
+    assert asyncio.run(run())["answer"] == "The otter rests upright."
+    assert len(attempts) == 2 and attempts[0] == attempts[1]

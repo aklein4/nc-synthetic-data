@@ -1,312 +1,193 @@
-# nc-synthetic-data
+# SystemsBench
 
-Run SystemsBench against MiMo-V2.6-Flash-MOPD on one National Compute node
-with eight MI355X GPUs. The service is standard vLLM with an OpenAI-compatible
-endpoint (`http://mimo:8000/v1/chat/completions`) and automatic prefix caching.
+Generate systems that a model learns implicitly from examples. Each catalogue
+setting has five or six shared input attributes with three or four qualitative
+values each, and eight distinct output metrics with four to six outcomes each.
+The catalogue supplies the setting. The model chooses short category labels;
+Python independently randomizes the causal mappings. One model call reviews all
+inputs and metrics together. If that review fails, one call revises the entire
+blueprint. There are no per-property repair loops. Python validates graph structure
+and reachability after construction. These are synthetic relationships, not
+claims about real science.
 
-The otter and Bean Seedling Growth 256/100 rows are complete. See
-[RESULTS.md](RESULTS.md) for artifacts, validation and measured performance.
-The MiMo server remains running for the next job; held-node billing continues.
+Every graph first tests one input. Some values directly select an outcome
+(depth one); other values select an anonymous intermediate that tests the second
+input and routes to an outcome (depth two). The second input is not read on a
+direct branch. The number of direct branches, their conditions, intermediate
+routes and outcome assignments vary. Every intermediate actually depends on the
+second input. Direct and depth-two outcomes are disjoint, every outcome is
+reachable, each graph uses two inputs overall, and every input affects at least
+two graphs. A sampled question requires one or two conditions.
 
-All persistent runtime data lives under `/mnt/shared/nc-synthetic-data`:
+Each question independently samples zero or one environmental distractor and
+one or two wholly acausal decorations. The environmental distractor is an input
+outside the active path: either an input outside the graph, or the second input
+when the first condition already selects a direct outcome. Python verifies that
+varying that distractor cannot change the result on the sampled path.
+Decorations are fresh subject/site names generated from only the setting and
+requested count; they have no physical effects or backstories and are not stored
+in the world. Python computes the gold outcome, samples three other possible
+outcomes from the same graph, and shuffles the four options.
 
-| Directory | Contents |
-| --- | --- |
-| `models/MiMo-V2.6-Flash-MOPD-http` | Pinned official weights, downloaded directly to NFS |
-| `cache` | Hugging Face, compiler, vLLM and package caches |
-| `code` | Standalone copy of this repository used by the jobs |
-| `logs` | Download, server and benchmark logs, package versions |
-| `runs/otter-256-100` | Checkpoint, audited attempts, validated calls, dataset, review |
-| `control` | `START` enables serving; `RUN` enables the benchmark |
+The question writer receives only the setting, metric name, shuffled facts and a
+writing variation: no reference question, graph or answer. It weaves those facts
+into a short science word problem of at most 55 words. Variations change sentence
+structure without adding a narrator or story. Each answer is generated separately
+from the brief setting, metric, assigned outcome and one shared answer variation. Answer calls
+receive no question, sampled facts, other answers or indication of correctness.
+Answers are short phrases (at most 16 words), with no first-person report or
+extra context. One combined verification call checks the question and all four
+answers, returning an individual verdict for each and a separate distractor
+verdict. The verifier receives the environmental/acausal distractor plan, including
+whether an environmental fact is an unused second criterion. It checks their
+counts, faithful inclusion and acausality, and rejects added distracting facts.
+It quotes evidence for every sampled detail, with the count fixed by the response
+schema; Python rejects missing quotes or quotes absent from the question. The
+answer writer receives no causal tables.
 
-The initial task is one river-otter system, eight rules per world, five worlds,
-256 training questions and 100 test questions, seed 42. Model quality checks,
-independent answer contexts, gold-only verification, answer-only possibility
-checks, retirement, split logic and export validation are inherited from the
-original benchmark. Reasoning is enabled for planning/writing/question stages
-and disabled for answers, verification, and language checks. Each stage uses
-an explicit boolean in the `THINKING` configuration. Sampling uses Xiaomi's
-recommended temperature 1.0 and top-p 0.95.
+Graph evaluation and sampling are exact; natural-language fidelity still relies
+on model judgment. Random assignment does not itself prove measured zero-shot
+accuracy is exactly 25%. Intermediate table slots spread outcomes as evenly as possible. Both splits balance questions across the eight metrics and independently
+sample scenarios from the same system, so input combinations may recur. Normalized
+duplicate question text is rejected. Failed candidates are automatically filtered
+and new candidates fill the remaining metric quotas; existing drafts are not
+rewritten. The inspection pilot is generated in one run without manual curation.
 
-The latest completed run uses `bean-seedling-256-100` and Bean Seedling Growth.
-It used 16 rules per world. The new full run retains 16 rules and allows at
-most four rule retirements per row after candidate-budget exhaustion. Accepted
-questions and rule text are preserved; only unfilled quota is redistributed.
-Version 52 sends the actual JSON schema to vLLM for constrained decoding,
-retains independent client validation, and fails fast on permanent HTTP 4xx
-errors. Question batches include only rules with remaining quota and request
-at most `min(question_batches, remaining_slots)` candidates per rule per round.
-They no longer multiply the call count when fewer rules remain. The full world
-description remains in the prompt to preserve context and prefix reuse.
-Per the user's clarification, effort labels have been removed. `THINKING`
-booleans pass directly to MiMo's `enable_thinking` switch.
-Thinking-enabled benchmark calls allow up to 131,072 output tokens, Xiaomi's
-documented maximum (reasoning plus visible output). Non-thinking calls retain
-their 512-token limit. The vLLM context window is 262,144 tokens to leave room
-for prompts alongside the full output budget.
-
-Each candidate also gets an answer-uniqueness call with its question and four
-options, without a world description or correct-answer hint. It returns
-`{"A": true, "B": true, "C": true, "D": true}` only when every answer makes a
-distinct prediction. Paraphrases count as duplicates, and every member of a
-duplicate group is marked false. Any false label rejects the question as
-`duplicate_answers`; the existing exact-text duplicate check remains. The call
-runs alongside verification and language checks, uses `THINKING["deduplication"]`
-(false by default), and saves its labels in the checkpoint and call audit.
-Export refuses answers with missing or failed uniqueness checks.
-
-The earlier weather benchmark was stopped before question generation. The
-subsequently authorized Bean row is complete and copied under gitignored
-`local_data/bean-seedling-256-100`. The server stays running, with `control/RUN`
-removed. Launch another row only when requested. Small smoke checks are separate
-from the full benchmark and do not create the RUN marker.
-
-## Provision and run
-
-Use `--context us-mi355-k8s-niveditha` on every kubectl command. The current
-user-authorized market ceiling is $4/GPU-hour ($32/node-hour maximum). Never
-raise it without new authorization. Read `/api/k8s/bid?cluster=...` and echo
-`version` as `expected_version` when setting it. The API token stays in
-`~/.config/nationalcompute/token`; it is never copied into this repository.
-
-1. Apply `k8s/serve.yaml` first. Its eight-GPU Job provisions a node, pulls a
-   pinned ROCm vLLM image, and waits for the `START` marker. The same Job becomes
-   the service, avoiding a second GPU request.
-2. Apply `k8s/benchmark.yaml` for the CPU worker. It waits for `RUN` and gives a
-   place to stage code and run the benchmark client.
-3. Copy this repository (excluding `.git`, `.venv`, `local`, and `local_data`) to `code/`
-   through `kubectl exec -i job/systems-bench -- tar ...`.
-4. In the GPU job, run `scripts/download.py` with `HF_HOME` pointing under
-   shared `cache/`. The image already includes Hugging Face Hub.
-   It pins model revision `2479e2d0029eca9a34cc7e7f55a121925f81908e` and writes
-   `.ready.json` only after download completion. The 178 GB checkpoint fits the
-   current 1 TiB shared volume. No Kimi weights are needed.
-   Use the GPU node's larger host memory for NFS writeback: downloads from the
-   64 GiB CPU worker stalled once dirty-page pressure rose. Xet is disabled;
-   four HTTP streams write directly to NFS, retaining completed files on retry.
-5. Create `control/START`. `scripts/serve.sh` waits for the completed weights,
-   records installed packages, and starts vLLM with tensor parallelism 8,
-   prefix caching, chunked prefill, 256 sequences and 32,768 batched tokens.
-   With user authorization, AITER compilation uses temporary node-local
-   `/tmp/nc-synthetic-data/aiter` scratch to avoid NFS compiler stalls.
-   Completed kernel modules are restored from shared storage at startup and
-   copied back every 15 seconds and on shutdown. Weights and benchmark data
-   always remain on shared storage. The first run completed compilation on NFS;
-   this scratch configuration applies to subsequent starts.
-6. Check `/health` and run `scripts/smoke.py --output-dir <shared-run>/smoke`
-   inside the CPU worker after installing `requirements.lock`. It exercises
-   every production schema, thinking modes, and eight replays of the previously
-   failing answer. Only after success create `control/RUN`. The benchmark uses
-   256 concurrent requests and up to 16 question batches per round. Long, stable world prefixes
-   precede variable styles/questions, allowing KV reuse.
-7. Verify `systems_bench.jsonl` contains exactly one row with 256/100 items;
-   run the same command with `--export-only` to revalidate saved provenance.
-
-`bash scripts/submit.sh` implements steps 1–5 without changing the standing bid.
-Before a fresh submission, delete the previous completed `systems-bench` Job
-and ensure `START`/`RUN` markers are absent; applying a completed Job does not
-run it again. Do not overwrite scripts while a live shell is reading them.
-
-The existing optional `api-keys` Kubernetes Secret supplies `HF_TOKEN` using
-`secretKeyRef`, following `nc-baseline/full-baseline.yaml`. No OpenRouter key
-is used. The service is cluster-internal. Credentials are excluded from audits.
-The client audit records usage and latency, not synthetic per-token dollar costs:
-actual charges come from National Compute's market and billing APIs.
-
-For the current workflow, leave the GPU serving pod running idle with the model
-loaded after the row completes, ready for the next run. The user explicitly
-requested this; held-node billing continues. When the user asks to stop it:
+## Generate
 
 ```sh
-kubectl --context us-mi355-k8s-niveditha -n default delete job mimo-serve
-kubectl --context us-mi355-k8s-niveditha -n default delete service mimo
+python -m pip install -r requirements.lock
+API_URL=http://localhost:8000/v1/chat/completions python systems_bench.py \
+  --subject animal-behavior --systems 1 --train 16 --test 8 \
+  --output-dir local_data/causal-pilot
 ```
 
-Leave the $4 bid in place, as requested. Remove the `START` and `RUN` markers
-before a new controlled launch. Shared data remains. Node billing continues
-through the first-hour minimum hold and applicable idle grace; a standing bid
-does not by itself request a node, but funds future GPU workloads.
+World generation, its combined review/revision, fresh names and questions use
+reasoning. Answers and the combined QA verification call do not.
+Calls omit sampling overrides and use the server defaults.
+Every call allows 131,072 output tokens, matching MiMo-V2.6-Flash's
+[official 128K maximum](https://mimo.mi.com/models/en-US/mimo-v2.6-flash).
+This is the generation ceiling, including reasoning; the short question/answer
+word limits are still checked separately.
 
-For access after the jobs stop, apply `k8s/storage-access.yaml`, then use
-`kubectl --context us-mi355-k8s-niveditha -n default exec nc-synthetic-data-storage -- ...`.
-It mounts shared storage without requesting a GPU. Delete that pod after use;
-it also has a one-hour active deadline.
+`MODEL` defaults to `mimo-v2.6-flash`. `INFERENCE_API_KEY` is optional. Use
+`--subject mixed` for the existing catalogue, `--concurrency` to bound requests,
+and `--upload owner/dataset` only when a Hub upload is intended.
+Train and test candidates run in one continuously replenished pool. Finished
+candidates are checkpointed immediately; a failed candidate frees its metric
+slot for a replacement without waiting for other requests. Pending reservations
+are checkpointed too, so interruption resumes the same sampled candidates.
+Question writing overlaps with its independent answer-writing sequence; the four
+answers still use separate, sequential calls. The request semaphore and HTTP
+connection pool both respect `--concurrency`. The full-row command uses 512,
+matching the current server's sequence limit. Prefix caching stays enabled.
+Concurrency naturally falls as the remaining output slots finish; the generator
+does not create surplus candidates just to keep GPUs occupied.
 
-## Provenance and checks
+A run saves its checkpoint, cached final model responses, API attempt audits, token
+usage, and `systems_bench.jsonl`. Each dataset row has `Setting`, `World`, and
+nested `train_data`/`test_data` containing question, four options, a zero-based
+`correct_option`, and `verification` results. `World` is graph metadata for inspection; **do not include it
+in the learner's question prompt**. Sampling provenance stays in the checkpoint.
+Reusing a run directory resumes completed work and cached calls. Changed source
+or run settings require a new directory. Historical runs remain separate.
+New audits save prompts, final content, timings and token counts, **not reasoning
+traces**. Reasoning fields and inline thinking blocks are discarded before writing;
+unparseable HTTP bodies retain only their byte count. Historical audits are not
+rewritten. The viewer reads structured final-response caches, never raw audits.
 
-Copied from `outer-loop/data_preparation/benchmarks/systems_bench.py` at local
-source SHA256 `8e510e15b87702ebbd590bc679e75b38c458b11fb214e17c918256bc5c8a7eb6`.
-The source repository HEAD was `27d0af28a528890251e4b12d33c1ce180eab6021`;
-the content hash is authoritative if that checkout had local edits.
-Catalogue SHA256: `75e477c98fe34203993f06aae027476aa89be3f8e710f9fef152db96b31f7a7a`.
-No runtime dependency on that repository exists.
+## Inspect a run
 
-Transport changes remove OpenRouter routing and cost reservations, use MiMo's
-thinking control, and retain complete local request/response audits. Source,
-catalogue and transport hashes enter checkpoint configuration so incompatible
-resumes fail explicitly. Do not alter prompts or acceptance checks mid-run.
+The local viewer needs only Python's standard library:
 
 ```sh
-uv venv
-uv pip install -r requirements.txt pytest
-.venv/bin/python -m pytest -q
+python view_run.py local_data/causal-full-256-100-continuous --port 8765
 ```
 
-Tests cover a full offline 256/100 export, resume and tamper rejection, stable
-prefixes, bounded concurrency, schema-constrained payloads, schema-echo rejection,
-permanent HTTP error handling, remaining-quota scheduling, duplicate-answer
-rejection for each of the four labels, uniqueness provenance, caching and audit privacy.
-Offline fixtures are synthetic tests, not benchmark results.
+Open **http://localhost:8765**. If Python runs on another machine, forward that
+machine's port 8765 to your browser's machine. The server binds to loopback only.
 
-## References
+The five stages follow the data from world draft and combined review/revision,
+through Python's randomized causal graphs, sampled facts and question writing,
+independent answer writing and combined verification, to the final dataset.
+Prompts and final outputs sit side by side; exact request JSON is expandable.
+Graph diagrams show every conditional route and can highlight an example's path.
+Browse one example at a time, filter by metric or split, reveal its answer, and
+inspect retained or filtered candidates. There are no animations or external
+assets. The evidence inspector flags quotes absent from the actual question,
+including candidates that the model approved but Python filtered out.
+Refresh reloads a run's latest local checkpoint and completed calls.
+The National Compute launcher copies the run locally when generation finishes.
 
-- [National Compute first-job Serve recipe](https://nationalcompute.com/FIRST-JOB.md)
-- [National Compute market and operating rules](https://nationalcompute.com/AGENTS.md)
-- [Kubernetes API contract](https://nationalcompute.com/api/k8s/openapi.json)
-- [Kimi starter used as a deployment example](https://access.nationalcompute.com/first-job/kimi-k3-serve-amd.yaml)
-- [Official MOPD model card](https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-MOPD)
-- [vLLM MiMo recipe and AMD configuration](https://recipes.vllm.ai/XiaomiMiMo/MiMo-V2.6-Flash-RL)
-- [vLLM ROCm installation](https://docs.vllm.ai/en/latest/getting_started/installation/gpu/)
+## National Compute
 
-## Reviewing completed rows
+Use cluster `us-mi355-k8s-niveditha`. The authorized ceiling is $3 per GPU-hour,
+or $24/hour maximum for one eight-MI355X node. The actual assessed rate comes
+from `python scripts/nc_snapshot.py`. A standing bid does not reserve capacity;
+an eight-GPU workload requests it. The token remains at
+`~/.config/nationalcompute/token`. Follow the current
+[National Compute setup instructions](https://nationalcompute.com/FIRST-JOB.md).
 
-`review.md` includes all five worlds with numbered rules, then accepted questions
-grouped by their target rule. Each question keeps its original Train/Test index.
-Review options always show the gold world first, followed by the remaining
-answer worlds in numerical order, with world labels. The question-writing world's
-answer is separate and inspection-only. Dataset options remain randomized.
+`k8s/serve.yaml` starts the pinned ROCm vLLM server on eight GPUs. It reads
+`scripts/serve.sh` from `/mnt/shared/nc-synthetic-data/code/`, waits for
+`control/START`, and uses cached weights under
+`models/MiMo-V2.6-Flash-MOPD-http`. `scripts/download.py` stages missing weights;
+`scripts/cache_sync.py` preserves the AITER compilation cache. All paths are
+relative to `/mnt/shared/nc-synthetic-data`. The service endpoint is
+`http://mimo:8000/v1/chat/completions` inside the cluster.
 
-Regenerate only the review of a saved run, without rewriting its dataset or
-checkpoint/source provenance:
+Once the service is healthy and the temporary CPU worker is absent:
 
 ```sh
-.venv/bin/python scripts/review.py local_data/bean-seedling-256-100
+# Small review pilot:
+bash run_full.sh causal-review-pilot --systems 1 --train 16 --test 8 --subject animal-behavior
+# Full dataset (no automatic upload):
+bash run_full.sh causal-64-256-100
+# One full row:
+bash run_full.sh causal-full-256-100-continuous --systems 1 --train 256 --test 100 --subject animal-behavior --concurrency 512
 ```
 
-## Full 64-row run and upload
-
-From this repository, run:
+The launcher freezes source in the run directory, runs a temporary CPU worker,
+copies artifacts into `local_data/<run>`, and removes that worker on exit. It
+leaves the GPU server running. Stop held GPU capacity with:
 
 ```sh
-bash run_full.sh
-# Optional destination override:
-bash run_full.sh your-account/your-dataset
+kubectl --context us-mi355-k8s-niveditha delete job mimo-serve
 ```
 
-The default destination is `aklein4/AlwaysLearningBench-v1`. The existing upload
-behavior is retained: a new repository is public; an existing repository keeps
-its visibility. The launcher creates/verifies the destination and write access
-before generation. The cluster Secret `api-keys` now uses the `aklein4` write token from
-`~/.config/nc-baseline/credentials.env`, as requested. The destination was not
-visible during read-only inspection; the launcher will create it and verify
-write access before generation. No full generation or upload was launched
-during preparation.
-
-The launcher uses the running MiMo service and a temporary CPU pod. Thirty-two rows
-run concurrently, including world building. The revised local configuration uses
-512 shared in-flight requests and 512 server sequences. It targets 64 completed
-rows drawn without reuse from 96 catalogue settings, with 16 rules/world and
-256/100 questions. Exact normalized question deduplication is global across rows.
-Exhausted settings are archived and replaced using unassigned catalogue entries.
-The original 64 entries are reserved for the initial row slots; the added 32 are
-replacement settings. Catalogue exhaustion stops the run; permanent API or
-unexpected infrastructure/program errors also stop rather than consume settings.
-
-The launcher starts a NEW run under `full-64-256-100-v56`, using these revised
-rules and prompts. The stopped v53 run remains untouched under
-`full-64-256-100`; its candidates are not reused. The GPU service is prepared
-for 512 sequences, while the standing bid and provisioned node are retained.
-Generation and upload begin only when you execute the launcher.
-
-Errors print to the terminal and the script returns a nonzero exit status. Run
-it with `bash`, not `source`; it does not close your terminal. Keep that terminal
-session connected for the run. On exit it removes only the temporary CPU worker;
-the GPU model service and standing bid remain untouched. If the local process is
-forcibly killed, an existing `systems-bench-full` pod causes the next invocation
-to stop rather than interfere with an active run.
-
-Run data and a frozen code snapshot live under
-`/mnt/shared/nc-synthetic-data/runs/full-64-256-100-v56`. Repeating the same command
-resumes that snapshot; subsequent working-tree edits do not alter it. Upload
-occurs only after complete export validation. `upload.json` records the commit.
-On success, all run artifacts are copied to gitignored
-`local_data/full-64-256-100-v56`. Incomplete runs stay on shared storage. The published
-dataset contains 64 rows with nested splits (16,384 training and 6,400 test
-questions in total); audits and checkpoint files stay outside the Hub dataset.
-
-Version 53 adds bounded row concurrency with indexed partial checkpoints and
-cancellation on row failure. The audit client now streams saved records on resume
-and uses constant-size usage counters, retaining full audits on disk rather than
-holding every prompt/response in memory. Twenty offline tests pass, including
-parallel world building, cross-row deduplication, failure cancellation, resume
-from partial checkpoints and audit usage across restarts. Older completed runs
-retain their original source archives and provenance.
-
-## Candidate-budget retirement (local version 55)
-
-A rule is eligible for retirement when its current quota is still unfilled and
-at least 10 times that quota candidates have been generated targeting it.
-The quota is the current quota, including any inherited slots. There is no
-acceptance-rate, minimum-evaluated-count, or rejected-round threshold. Eligibility
-is checked between completed generation/evaluation rounds, so the threshold may
-be crossed within a batch. At most four rules retire per row; the existing
-selection and unfilled-quota redistribution order remain unchanged.
-
-A row is discarded after 20 times its total quota candidates have been generated
-and evaluated/deduplicated without filling its accepted pool: 7,120 candidates
-for a 256/100 row. The last batch is trimmed to the remaining row budget, and
-its candidates are processed before deciding whether to discard. This replaces
-the old 128-round limit. The separate 12-world-iteration and eight-request-attempt
-limits remain, with exhaustion triggering setting replacement in the local code.
-
-Generated counts include duplicate question strings returned by successful,
-schema-valid question-generation calls, before deduplication. Each occurrence
-counts toward its target rule and the row total. Counts persist in each rule's
-`generated` checkpoint field; cached requests replayed during resume are counted
-once when the batch is committed. Rejected malformed call responses are request
-failures, not generated candidates. Discarded rows retain their partial data and
-reason in the checkpoint but are omitted from the final exported dataset.
-
-## Per-rule collision evidence (local version 56)
-
-The collision verifier must construct one question for each rule whose SAME
-scenario gives pairwise semantically distinct, mutually incompatible answers in
-all five worlds. It returns a rule-ordered `rule_examples` array, each containing
-`distinguishable`, `question`, five `answers` in input-world order, and `reason`.
-For an unsuccessful rule it returns false and empty question/answer strings,
-with an explanation of which worlds it cannot distinguish. Global `distinct`
-may pass only if every rule has a successful example. Code also rejects missing
-examples, false per-rule flags, empty evidence, or normalized identical answers.
-Semantic distinctness remains the verifier's judgment, not an independent test.
-
-Examples are saved in validated collision call records for every attempt and in
-the final accepted system checkpoint. Review output includes a separate inspection
-section with the five answers labeled by world, gold first. They never enter the
-training/test candidate pool or generation counters, and are not sent into
-question-generation or revision prompts. Revision feedback includes per-rule
-flags and reasons only. Failed per-rule collision evidence follows the existing
-collision-failure revision path. The fresh-run launcher uses these checks; the stopped historical run is unchanged.
-
-## Data explorer
-
-`explorer/` serves a read-only web explorer for a completed run. It walks
-through the setting, world-building attempts, roles, every sampled question
-draft (generation, five answers, checks, and the final dataset entry) and every
-retained model call in `filtered_audit/`. It uses only the Python standard
-library:
+For the complete **64-row, 256-train / 100-test** release to
+`aklein4/AlwaysLearningBench-v2`, use the dedicated launcher while MiMo is ready:
 
 ```sh
-nohup python3 explorer/server.py --port 8765 > local_data/explorer/server.log 2>&1 &
-# then open http://<host-ip>:8765/
+mkdir -p local_data
+nohup python3 run_publish.py > local_data/alwayslearning-v2.log 2>&1 &
 ```
 
-The first start builds `local_data/explorer/<run>.sqlite` (about one minute,
-2.7 GB); `--rebuild` forces a rebuild and `--run` selects another run directory.
-The original checkpoint isn't stored locally, so `explorer/reconstruct.py`
-recovers structure from request contents: settings by shared background,
-attempts through the revision feedback in each plan prompt, and answer worlds by
-description text. Answer-only checks are matched by prompt and timing, because
-their prompts omit the question and the audit filter may label identical
-requests with another draft. Rejection reasons are recomputed with the frozen
-acceptance logic. The build asserts that all 64 gold worlds match the dataset,
-and it reports any recomputed verdict that disagrees with the run (zero for v56).
+It uses the mixed catalogue and concurrency 512, validates/exports the complete
+dataset, uploads it using the CPU worker's `HF_TOKEN`, and copies artifacts to
+`local_data/alwayslearning-v2-64-256-100`. Follow progress with
+`tail -f local_data/alwayslearning-v2.log`. The upload commit is recorded in
+`upload.json`; raw calls and audits are kept locally/shared, not uploaded.
+
+After the run exits, including generation/upload failure or a handled interrupt,
+the launcher deletes the MiMo job and withdraws the cluster's GPU bid using
+`~/.config/nationalcompute/token`. Both cleanup operations are retried on errors;
+failed cleanup is reported with a nonzero exit. Shared checkpoints survive node
+release. Preflight refuses an existing CPU worker, an unready MiMo server, or a
+bid outside the authorized $3/GPU-hour ceiling, without stopping existing work.
+`nohup` lets it continue when the terminal disconnects; host loss or SIGKILL
+cannot run cleanup. Check the log's final shutdown confirmation. An interrupted
+run can be resumed with the same name after restarting MiMo and restoring its bid.
+`--run-name NAME` chooses a separate run directory.
+
+For runs using `run_full.sh` directly, withdraw the bid separately through the
+National Compute API when no further GPU work is wanted.
+Historical experiments are recorded in `RESULTS.md` and
+the earlier sections of `PROGRESS.md`; their old pipelines were removed.
+
+## Check
+
+```sh
+python -m pip install pytest
+python -m pytest -q test_systems_bench.py test_local_api.py test_view_run.py test_run_publish.py
+```
