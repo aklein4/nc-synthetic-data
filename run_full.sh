@@ -13,6 +13,20 @@ K=(kubectl --context us-mi355-k8s-niveditha -n default)
 "${K[@]}" create -f k8s/full-worker.yaml
 trap '"${K[@]}" delete pod systems-bench-full --wait=false >/dev/null' EXIT
 "${K[@]}" wait --for=condition=Ready pod/systems-bench-full --timeout=300s
+if [[ -n "${RUN_SEED_DIR:-}" ]]; then
+  # Stage once, atomically; subsequent invocations keep the shared checkpoint.
+  test -f "$RUN_SEED_DIR/reuse.json"
+  test -f "$RUN_SEED_DIR/code/.ready"
+  if ! "${K[@]}" exec systems-bench-full -- test -d "$RUN"; then
+    STAGING="${RUN}.staging-$$"
+    "${K[@]}" exec systems-bench-full -- mkdir -p "$STAGING"
+    tar -C "$RUN_SEED_DIR" -cf - . |
+      "${K[@]}" exec -i systems-bench-full -- tar --checkpoint=1000 -C "$STAGING" -xf -
+    "${K[@]}" exec systems-bench-full -- mv -T "$STAGING" "$RUN"
+  fi
+  "${K[@]}" exec systems-bench-full -- cat "$RUN/reuse.json" | cmp - "$RUN_SEED_DIR/reuse.json"
+  "${K[@]}" exec systems-bench-full -- test -f "$RUN/checkpoint.json"
+fi
 if ! "${K[@]}" exec systems-bench-full -- test -f "$RUN/code/.ready" >/dev/null 2>&1; then
   "${K[@]}" exec systems-bench-full -- mkdir -p "$RUN/code"
   tar -cf - systems_bench.py local_api.py requirements.lock system_data |

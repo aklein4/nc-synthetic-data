@@ -314,7 +314,7 @@ async def render(models, key, world, spec):
     spec = dict(spec, details=list(spec["details"]))
     count = spec["decoration_count"]
     decorations = await models.call(key + "-decorations", DECORATION_PROMPT + json.dumps(
-        dict(setting=world["setting"], count=count)), obj(details=array(DETAIL, count, count)), thinking=True)
+        dict(setting=world["setting"], count=count)), obj(details=array(DETAIL, count, count)))
     spec["decorations"] = decorations["details"]
     spec["details"] += spec["decorations"]
     rng.shuffle(spec["details"])
@@ -375,6 +375,8 @@ async def generate(args, models):
     config = dict(seed=args.seed, systems=args.systems, train=args.train, test=args.test,
                   subject=args.subject, model=MODEL, api_url=API_URL,
                   source=hashlib.sha256(b"".join(p.read_bytes() for p in (Path(__file__), ROOT / "local_api.py", ROOT / "system_data/catalogue.json"))).hexdigest())
+    if getattr(args, "shuffle_train", False):
+        config["shuffle_train"] = True
     path = args.output_dir / "checkpoint.json"
     state = json.loads(path.read_text()) if path.exists() else dict(config=config, systems=[])
     if state["config"] != config:
@@ -510,7 +512,7 @@ def validate_item(world, item):
 
 def export(state, directory):
     rows = []
-    for system in state["systems"]:
+    for index, system in enumerate(state["systems"]):
         validate_world(system["world"])
         row = dict(Setting=system["world"]["setting"], World=json.dumps(system["world"], ensure_ascii=False))
         for split in ("train", "test"):
@@ -519,7 +521,10 @@ def export(state, directory):
             for item in system[split]:
                 validate_item(system["world"], item)
             row["num_" + split] = len(system[split])
-            row[split + "_data"] = [{k: item[k] for k in ("question", "options", "correct_option", "verification")} for item in system[split]]
+            items = list(system[split])
+            if split == "train" and state["config"].get("shuffle_train"):
+                random.Random(f"{state['config']['seed']}:{index}:export-train").shuffle(items)
+            row[split + "_data"] = [{k: item[k] for k in ("question", "options", "correct_option", "verification")} for item in items]
         rows.append(row)
     if len(rows) != state["config"]["systems"]:
         raise ValueError("Incomplete dataset")
@@ -534,6 +539,7 @@ def parse_args(argv=None):
     for name, default in dict(systems=1, train=16, test=8, seed=42, concurrency=16).items():
         parser.add_argument("--" + name, type=int, default=default)
     parser.add_argument("--upload", metavar="DATASET", help="Optional Hugging Face destination")
+    parser.add_argument("--shuffle-train", action="store_true", help="Deterministically shuffle each exported train split")
     args = parser.parse_args(argv)
     if min(args.systems, args.train, args.test, args.concurrency) < 1:
         parser.error("Counts and concurrency must be positive")

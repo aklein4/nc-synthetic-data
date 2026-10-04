@@ -376,3 +376,67 @@ def test_retry_empty_completion_content(tmp_path, monkeypatch):
             return await b.Models(client, tmp_path, 1).call("answer", "Write an answer", b.ANSWER)
     assert asyncio.run(run())["answer"] == "The otter rests upright."
     assert len(attempts) == 2 and attempts[0] == attempts[1]
+
+
+def test_extension_preserves_test_and_shuffles_only_export(blueprint, tmp_path):
+    args = b.parse_args(['--output-dir', str(tmp_path), '--systems', '2',
+                         '--train', '8', '--test', '8', '--shuffle-train'])
+    initial = asyncio.run(b.generate(args, FakeModels(blueprint)))
+    original = deepcopy(initial)
+    initial['config']['train'] = args.train = 32
+    b.atomic_json(tmp_path / 'checkpoint.json', initial)
+    models = FakeModels(blueprint)
+    extended = asyncio.run(b.generate(args, models))
+    assert all('-test-' not in key and '-world' not in key for key, _ in models.calls)
+    for old, new in zip(original['systems'], extended['systems']):
+        assert new['world'] == old['world']
+        assert new['test'] == old['test']
+        assert new['train'][:8] == old['train']
+        assert new['attempts']['test'] == old['attempts']['test']
+    before_export = deepcopy(extended)
+    exported = b.export(extended, tmp_path)
+    assert extended == before_export
+    assert b.export(extended, tmp_path) == exported
+    for row, saved in zip(exported, extended['systems']):
+        train_questions = [q['question'] for q in row['train_data']]
+        assert set(train_questions) == {q['question'] for q in saved['train']}
+        assert train_questions != [q['question'] for q in saved['train']]
+        old_questions = {q['question'] for q in saved['train'][:8]}
+        assert any(q in old_questions for q in train_questions[8:])
+        assert [q['question'] for q in row['test_data']] == [q['question'] for q in saved['test']]
+    resumed = FakeModels(blueprint)
+    assert asyncio.run(b.generate(args, resumed)) == extended
+    assert not resumed.calls
+
+
+def test_extension_rejects_old_train_and_old_test_questions(blueprint, tmp_path, monkeypatch):
+    args = b.parse_args(['--output-dir', str(tmp_path), '--systems', '1',
+                         '--train', '8', '--test', '8'])
+    initial = asyncio.run(b.generate(args, FakeModels(blueprint)))
+    old_train = initial['systems'][0]['train'][0]['question']
+    old_test = initial['systems'][0]['test'][0]['question']
+    old_test_items = deepcopy(initial['systems'][0]['test'])
+    initial['config']['train'] = args.train = 16
+    b.atomic_json(tmp_path / 'checkpoint.json', initial)
+    real_render = b.render
+    attempts = []
+
+    async def repeat_starting_examples(*a, **kw):
+        item = await real_render(*a, **kw)
+        if len(attempts) < 2:
+            # Both case and whitespace changes must still count as duplicates.
+            original = [old_train, old_test][len(attempts)]
+            item['question'] = '  ' + original.upper().replace(' ', '  ') + '  '
+        attempts.append(item['question'])
+        return item
+
+    monkeypatch.setattr(b, 'render', repeat_starting_examples)
+    extended = asyncio.run(b.generate(args, FakeModels(blueprint)))
+    row = extended['systems'][0]
+    assert len(row['train']) == 16
+    assert len(attempts) == 10  # Eight new slots, plus two rejected duplicates.
+    assert row['test'] == old_test_items
+    normalized = [b.normalized(q['question']) for q in row['train'] + row['test']]
+    assert len(normalized) == len(set(normalized)) == 24
+    assert all(b.normalized(q['question']) not in {b.normalized(old_train), b.normalized(old_test)}
+               for q in row['train'][8:])

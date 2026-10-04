@@ -128,3 +128,38 @@ if 'exec' in args and 'tar' in args:
     assert commands[-1][4:7] == ["delete", "pod", "systems-bench-full"]
     generation = next(c for c in commands if any(a.endswith('/systems_bench.py') for a in c))
     assert generation[-2:] == ["--upload", p.REPOSITORY]
+
+
+def test_long_run_target_and_shuffle(monkeypatch):
+    commands = []
+    monkeypatch.setattr(p, 'preflight', lambda token: None)
+    monkeypatch.setattr(p, 'release_gpu', lambda token: None)
+    monkeypatch.setattr(p.signal, 'signal', lambda *args: None)
+
+    class Child:
+        def __init__(self, command, **kwargs):
+            commands.append(command)
+        def wait(self):
+            return 0
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(p.subprocess, 'Popen', Child)
+    assert p.run('long-run', 'fake', systems=10, train=2048, test=100,
+                 repository='aklein4/AlwaysLearningBench-v2-long', shuffle_train=True) == 0
+    assert commands == [['bash', 'run_full.sh', 'long-run', '--systems', '10',
+                         '--train', '2048', '--test', '100', '--subject', 'mixed',
+                         '--concurrency', '512', '--upload',
+                         'aklein4/AlwaysLearningBench-v2-long', '--shuffle-train']]
+
+
+def test_withdrawn_bid_can_be_null(monkeypatch):
+    calls = []
+    def request(token, body=None):
+        calls.append(body)
+        return dict(max_price_per_gpu_hour=3, version=16) if body is None else dict(max_price_per_gpu_hour=None)
+    monkeypatch.setattr(p, 'bid_request', request)
+    p.withdraw_bid('fake')
+    assert calls[-1]['max_price_per_gpu_hour'] == 0
+    monkeypatch.setattr(p, 'bid_request', lambda token: dict(max_price_per_gpu_hour=None))
+    p.withdraw_bid('fake')  # Already withdrawn: no write is necessary.

@@ -611,3 +611,31 @@
 - Five viewer tests pass, including export selection, exclusion of audit traces
   and safe encoding of script-like content. Offline browser checks cover all five
   stages for all three settings without HTTP requests or browser errors.
+
+## Prepared long v2 extension
+
+- Provisioning requested for one eight-MI355X node with the existing pinned MiMo
+  serving job, with an explicit $3/GPU-hour bid (version 16). Cached weights and
+  START marker are present; generation has not been started.
+- `prepare_long.py` creates a separate frozen run from rows 1–10 of the completed
+  64-row 256/100 parallel run. All worlds, 2,560 train examples, 1,000 test
+  examples, and attempt counters compare exactly to the original source. The
+  source run is untouched. Retained call caches accompany the checkpoint.
+- `run_long.py` waits for server readiness, then generates 1,792 additional train
+  examples per row at concurrency 512, exports 10 × 2048/100, publishes to
+  `aklein4/AlwaysLearningBench-v2-long`, copies artifacts locally, and releases
+  the GPU job/bid through the existing cleanup wrapper. HF identity `aklein4`
+  and token write role were verified without displaying credentials.
+- The new `--shuffle-train` option deterministically shuffles old/new examples
+  together in each exported train split without changing checkpoint order or
+  test order/content. Deduplication starts with both splits of every seeded row
+  and continues across all accepted candidates (normalized question text).
+- Regression tests cover rejecting old train/test duplicates, preservation of
+  test/world data, deterministic export shuffling, resume, and the long-run
+  publication target. README includes the tmux start command and resume details.
+- Validation: 48 tests pass across generation, API, viewer, and launcher suites.
+  Cleanup accepts the API’s null representation of a withdrawn bid as well as
+  zero; the actual withdrawal request explicitly sends a zero ceiling.
+- Shared seed staging completed and was validated against the source, including
+  all 43,078 retained response caches. `run_long.sh` is the foreground tmux
+  entry point; it invokes the prepared Python lifecycle wrapper.

@@ -62,8 +62,8 @@ API_URL=http://localhost:8000/v1/chat/completions python systems_bench.py \
   --output-dir local_data/causal-pilot
 ```
 
-World generation, its combined review/revision, fresh names and questions use
-reasoning. Answers and the combined QA verification call do not.
+World generation, its combined review/revision and questions use reasoning.
+Fresh names (decorations), answers and the combined QA verification call do not.
 Calls omit sampling overrides and use the server defaults.
 Every call allows 131,072 output tokens, matching MiMo-V2.6-Flash's
 [official 128K maximum](https://mimo.mi.com/models/en-US/mimo-v2.6-flash).
@@ -227,3 +227,40 @@ the earlier sections of `PROGRESS.md`; their old pipelines were removed.
 python -m pip install pytest
 python -m pytest -q test_systems_bench.py test_local_api.py test_view_run.py test_run_publish.py
 ```
+
+## Long v2 run: 10 worlds, 2048 train / 100 test
+
+The prepared launcher reuses rows 1–10 from the completed
+`alwayslearning-v2-64-256-100-parallel` run. Each world keeps its original 256
+training examples and all 100 test examples, and adds 1,792 training examples.
+The final export deterministically shuffles all 2,048 old and new training
+examples together per row; test content and order stay unchanged. The checkpoint
+retains append order for reliable resume. Duplicate filtering includes all 356 starting examples per world, across all
+10 worlds, plus newly accepted training examples. It normalizes case, whitespace
+and punctuation; it is a question-text filter, not a semantic paraphrase filter.
+
+Start from this repository in tmux:
+
+```sh
+tmux new -s alwayslearning-long
+bash run_long.sh
+```
+
+Detach with Ctrl-B then D; reattach with `tmux attach -t alwayslearning-long`.
+The launcher uses concurrency 512 and publishes to
+`aklein4/AlwaysLearningBench-v2-long`. It removes the MiMo GPU job and sets the National Compute GPU bid to $0
+after completion, failure, or a handled interrupt, just like the v2
+launcher. The launcher waits up to 40 minutes for the provisioned server to become ready.
+Its readiness can be checked
+with `kubectl --context us-mi355-k8s-niveditha get pods -l app=mimo-serve`.
+Preflight errors leave the provisioned server running.
+
+Artifacts and the upload receipt are copied to
+`local_data/alwayslearning-v2-long-10-2048-100`; durable checkpoints also live at
+`/mnt/shared/nc-synthetic-data/runs/alwayslearning-v2-long-10-2048-100`.
+`reuse.json` records source rows, hashes, counts and settings. `prepare_long.py`
+created this separate seed and froze the current source (including decoration
+names without reasoning); the original run is unchanged. First staging is atomic
+and subsequent invocations resume the shared checkpoint without overwriting it.
+To resume after GPU cleanup, restore the $3/GPU-hour bid and apply
+`k8s/serve.yaml`, wait for readiness, then run the same command.

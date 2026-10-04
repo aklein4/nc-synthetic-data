@@ -34,11 +34,12 @@ def bid_request(token, body=None):
 
 def withdraw_bid(token):
     current = bid_request(token)
-    if current["max_price_per_gpu_hour"] == 0:
+    if current["max_price_per_gpu_hour"] in (0, None):
         return
     result = bid_request(token, dict(cluster=CLUSTER, max_price_per_gpu_hour=0,
                                      expected_version=current["version"]))
-    if result["max_price_per_gpu_hour"] != 0:
+    # The API represents an absent/withdrawn bid as either zero or null.
+    if result["max_price_per_gpu_hour"] not in (0, None):
         raise RuntimeError("National Compute did not confirm bid withdrawal")
 
 
@@ -71,7 +72,7 @@ def release_gpu(token):
 
 def preflight(token):
     bid = bid_request(token)
-    if not 0 < bid["max_price_per_gpu_hour"] <= 3:
+    if bid["max_price_per_gpu_hour"] is None or not 0 < bid["max_price_per_gpu_hour"] <= 3:
         raise RuntimeError("Expected an active GPU bid at or below the authorized $3/GPU-hour ceiling")
     worker = subprocess.check_output(
         KUBECTL + ["get", "pod", "systems-bench-full", "--ignore-not-found=true", "-o", "name"],
@@ -83,16 +84,17 @@ def preflight(token):
                               "--timeout=60s"], check=True, timeout=90)
 
 
-def run(run_name, token):
+def run(run_name, token, *, systems=64, train=256, test=100, repository=REPOSITORY, shuffle_train=False):
     preflight(token)
     child = None
     status = 1
     try:
-        print(f"Generating 64 rows × (256 train + 100 test); uploading to {REPOSITORY}.", flush=True)
+        print(f"Generating {systems} rows × ({train} train + {test} test); uploading to {repository}.", flush=True)
         child = subprocess.Popen(
-            ["bash", "run_full.sh", run_name, "--systems", "64", "--train", "256",
-             "--test", "100", "--subject", "mixed", "--concurrency", "512",
-             "--upload", REPOSITORY], cwd=ROOT, start_new_session=True)
+            ["bash", "run_full.sh", run_name, "--systems", str(systems), "--train", str(train),
+             "--test", str(test), "--subject", "mixed", "--concurrency", "512",
+             "--upload", repository] + (["--shuffle-train"] if shuffle_train else []),
+            cwd=ROOT, start_new_session=True)
         status = child.wait()
     except KeyboardInterrupt:
         status = 130
@@ -115,7 +117,7 @@ def run(run_name, token):
                 print(str(error), file=sys.stderr, flush=True)
                 status = status or 1
     if status == 0:
-        print(f"Uploaded: https://huggingface.co/datasets/{REPOSITORY}\n"
+        print(f"Uploaded: https://huggingface.co/datasets/{repository}\n"
               f"Local artifacts: {ROOT / 'local_data' / run_name}", flush=True)
     else:
         print(f"Run failed (exit {status}). Check the log; shared checkpoints remain at "
